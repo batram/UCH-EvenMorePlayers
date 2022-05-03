@@ -29,7 +29,7 @@ class GraphScoreBoard
 
 
 InputManager
-  function InputManager.EnableNativeInput             patch getter to always return true, so we can use more controllers
+  [DD] function InputManager.EnableNativeInput             patch getter to always return true, so we can use more controllers
 
 
 class InventoryBook
