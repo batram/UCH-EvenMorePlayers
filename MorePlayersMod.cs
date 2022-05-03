@@ -5,6 +5,7 @@ using System.Reflection.Emit;
 using BepInEx;
 using HarmonyLib;
 using UnityEngine;
+using InControl;
 
 namespace MorePlayers
 {
@@ -37,7 +38,7 @@ namespace MorePlayers
             yield return AccessTools.Method(typeof(KickTracker), nameof(KickTracker.CountVotes));
             yield return AccessTools.Method(typeof(KickTracker), nameof(KickTracker.VotesFromNetworkNumber));
             yield return AccessTools.Method(typeof(KeyboardInput), nameof(KeyboardInput.Reset));
-            yield return AccessTools.Method(typeof(VersusControl), "get_playersLeftToPlace");
+            yield return AccessTools.Method(typeof(VersusControl), "get_playersLeftToPlace"); 
 
             yield return AccessTools.Method(typeof(Controller), nameof(Controller.AddPlayer));
             yield return AccessTools.Method(typeof(ControllerDisconnect), nameof(ControllerDisconnect.SetPromptForPlayer));
@@ -49,10 +50,10 @@ namespace MorePlayers
 
             yield return AccessTools.Method(typeof(PartyBox), nameof(PartyBox.SetPlayerCount));
         }
-
+        
         static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> e)
         {
-            foreach (var inst in e)
+            foreach(var inst in e)
             {
                 if (inst.opcode == OpCodes.Ldc_I4_4)
                 {
@@ -70,12 +71,12 @@ namespace MorePlayers
         {
             yield return AccessTools.Method(typeof(PartyBox), nameof(PartyBox.AddPlayer));
         }
-
+        
         static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> e)
         {
             var count = 0;
 
-            foreach (var inst in e)
+            foreach(var inst in e)
             {
                 if (inst.opcode == OpCodes.Ldc_I4_4 && count == 0)
                 {
@@ -98,10 +99,10 @@ namespace MorePlayers
 
             yield return AccessTools.Method(typeof(GraphScoreBoard), nameof(GraphScoreBoard.SetPlayerCharacter));
         }
-
+        
         static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> e)
         {
-            foreach (var inst in e)
+            foreach(var inst in e)
             {
                 if (inst.opcode == OpCodes.Ldc_I4_3)
                 {
@@ -194,7 +195,7 @@ namespace MorePlayers
         {
             Debug.Log("fixed LevelSelectController");
             __instance.JoinedPlayers = new LobbyPlayer[8];
-
+            
             if (__instance.PlayerJoinIndicators.Length < PlayerManager.maxPlayers)
             {
                 int num = __instance.PlayerJoinIndicators.Length;
@@ -261,7 +262,7 @@ namespace MorePlayers
         static void Postfix(LobbyManager __instance)
         {
             Debug.Log("LobbyManager.instance.lobbySlots " + __instance.lobbySlots.Length);
-
+            
             __instance.maxPlayers = PlayerManager.maxPlayers;
             __instance.maxPlayersPerConnection = PlayerManager.maxPlayers;
 
@@ -315,7 +316,7 @@ namespace MorePlayers
             //cursorSpawnLocation
         }
     }
-
+    
 
     [HarmonyPatch(typeof(ControllerDisconnect), MethodType.Constructor)]
     static class ControllerDisconnectCtorPatch
@@ -335,6 +336,17 @@ namespace MorePlayers
             };
             //___showingPrompts = new bool[PlayerManager.maxPlayers];
             __instance.orphanedCharacters = new Character.Animals[PlayerManager.maxPlayers][];
+        }
+    }
+
+
+    [HarmonyPatch(typeof(InputManager), "get_EnableNativeInput")]
+    static class InputManagerCtorPatch
+    {
+        static void Postfix(ref bool __result)
+        {
+            Debug.Log("InputManager.EnableNativeInput");
+            __result = true;
         }
     }
 }
