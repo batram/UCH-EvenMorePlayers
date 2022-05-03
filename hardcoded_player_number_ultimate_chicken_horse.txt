@@ -1,0 +1,132 @@
+[MP] class and function already fixed in notfood/UCH-MorePlayers
+[DD] done for a first try
+
+class Controller
+  [MP] associatedChars = new Character.Animals[4];
+
+  [DD] function Controller.AddPlayer                       hardcoded 4 comparison
+  [MP] function Controller.AssociateCharacter         hardcoded 4 comparison
+  [MP] function Controller.ClearPlayers               hardcoded 4 size
+  [DD] function Controller.GetLastPlayerNumber             hardcoded 3 comparison (in for loop 3 to 0) 
+  [DD] function Controller.GetLastPlayerNumberAfter        hardcoded 3 comparison (in for loop 3 to 0) 
+  [no clue] function Controller.RemovePlayer                    num calc problems
+
+
+class ControllerDisconnect
+  [DD] ConnectPrompts      = init to 4 MonoBehaviour
+  [DD] orphanedReceivers   = List with 4 entries
+  [DD] orphanedCharacters  = new Character.Animals[4][];    
+  [fail] showingPrompts      = new bool[4];  private
+
+  [DD] function ControllerDisconnect.SetPromptForPlayer    hardcoded 4 comparison
+
+
+class GraphScoreBoard
+  [!MP] ScorePositions = new RectTransform[4];        MorePlayers extends ScorePositions, but does not setup new ones???
+
+  [DD] function GraphScoreBoard.SetPlayerCount             hardcoded 4 comparison, add ScorePositions for additional players
+  [DD] function GraphScoreBoard.SetPlayerCharacter         hardcoded 3 comparison (order: 0 to 3)
+
+
+InputManager
+  function InputManager.EnableNativeInput             patch getter to always return true, so we can use more controllers
+
+
+class InventoryBook
+  [DD] function InventoryBook.HasCursor                    hardcoded 4 comparison
+  [DD] function InventoryBook.GetCursor                    hardcoded 4 comparison
+  [DD] function InventoryBook.AddPlayer                    hardcoded 4 comparison, fixup cursor spawn location for additional players
+
+
+[MP] class KickTracker
+  [MP] constructor KickTracker                        hardcoded 4 comparison and size
+
+  [MP] function KickTracker.ClearPlayer               hardcoded 4 comparison
+  [MP] function KickTracker.CountVotes                hardcoded 4 comparison
+  [MP] function KickTracker.VotesFromNetworkNumber    hardcoded 4 comparison    [!U8 missing]
+  
+  
+class LevelPortal     
+  VoteArrows                                          fudge with VoteArrows
+
+
+class LevelSelectController
+  [MP] JoinedPlayers = new LobbyPlayer[4];
+  PlayerJoinIndicators                                map indicators to 0..3, we reuse existing 4 indicators for multiple players 
+  CursorSpawnPoint		                                map cursor spawn points to 0..3 (TODO: add new positions)
+  
+  
+class LobbyPointCounter
+  [MP] playerJoinedGame
+  [MP] playerPlayedGame
+  [MP] playerAFK
+  
+  [DD] function handleEvent                                ??? not patched yet: hardcoded 4 GameStartEvent
+  [DD] function Reset                                      ??? not patched yet: hardcoded reset of playerPlayedGame for 0..3 
+
+
+class LobbySkillTracker
+  [MP] ratings = new Rating[4];                                     
+  
+  function UpdateLobbyInfo                            ??? not patched yet: hardcoded 4 comparison
+  function LobbySkillTracker.RecalculateScores        hardcoded 4 comparison, patched out (incomplete fix)
+  
+  
+class PartyBox
+  [DD] function PartyBox.AddPlayer	                        hardcoded 4 comparison !!carefull additional ldc.i4.4 in IL code unrelated to player number as array index
+  [DD] function PartyBox.SetPlayerCount	                  hardcoded 4 comparison
+  
+
+class StatTracker
+  saveFiles = new SaveFileData[4];
+  saveStatuses = new StatTracker.SaveFileStatus[4];
+  
+  function StatTracker.GetSaveFileDataForLocalPlayer  hardcoded 4
+  function StatTracker.OnLocalPlayerAdded             hardcoded 4
+
+
+[MP] class VersusControl
+  [MP] winOrder = new GamePlayer[4];                           
+  [MP] RemainingPlacements = new int[4];                       
+      
+  [fail] function VersusControl.playersLeftToPlace      hardcoded 4 comparison, protected bool getter
+
+
+fixed up in Loader.cs:
+
+  class GameSettings
+    [DD] int MaxPlayers = 4;
+    [DD] PlayerColors                                      Random generate colors for new players
+
+  class PlayerManager                                 maybe not needed if GameSettings.GetInstance().MaxPlayers is correct from the start                          
+    maxPlayers
+    playerList
+
+  class LobbyManager
+    lobbySlots
+  
+  class StatTracker
+    saveStatuses
+    saveFiles
+  
+  class NetworkLobbyManager
+    m_MaxPlayers = 4;                                 ??? not patched yet ...
+    
+    
+Missing from U8 patch:
+  ChallengeScoreboard
+    players
+    ChallengeScoreboard.CollectPlayerIds
+    
+  Tablet
+    untrackedCursors
+  
+  GameState
+    PlayerScores
+  
+  UnityMatchmaker.CreateUnityMatch
+  TurnIndicator.SetPlayerCount
+  SwitchController.Reset
+  KeyboardInput.Reset
+  
+  
