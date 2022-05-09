@@ -1,11 +1,11 @@
-using System.Collections.Generic;
-using System;
-using System.Reflection;
-using System.Reflection.Emit;
 using BepInEx;
 using HarmonyLib;
-using UnityEngine;
 using InControl;
+using System;
+using System.Collections.Generic;
+using System.Reflection;
+using System.Reflection.Emit;
+using UnityEngine;
 
 namespace MorePlayers
 {
@@ -24,40 +24,47 @@ namespace MorePlayers
     }
 
     [HarmonyPatch]
-    static class Switch4For8Patch
+    static class Switch4ForMaxNumPatch
     {
         static IEnumerable<MethodBase> TargetMethods()
         {
             yield return AccessTools.Method(typeof(ChallengeScoreboard), nameof(ChallengeScoreboard.CollectPlayerIds));
-            yield return AccessTools.Method(typeof(UnityMatchmaker), nameof(UnityMatchmaker.CreateUnityMatch));
+            yield return AccessTools.Method(typeof(Controller), nameof(Controller.AddPlayer));
             yield return AccessTools.Method(typeof(Controller), nameof(Controller.AssociateCharacter));
-            yield return AccessTools.Method(typeof(TurnIndicator), nameof(TurnIndicator.SetPlayerCount));
-            yield return AccessTools.Method(typeof(SwitchController), nameof(SwitchController.Reset));
+            yield return AccessTools.Method(typeof(ControllerDisconnect), nameof(ControllerDisconnect.SetPromptForPlayer));
+            yield return AccessTools.Method(typeof(GraphScoreBoard), nameof(GraphScoreBoard.SetPlayerCount));
+            yield return AccessTools.Method(typeof(InventoryBook), nameof(InventoryBook.AddPlayer));
+            yield return AccessTools.Method(typeof(InventoryBook), nameof(InventoryBook.GetCursor));
+            yield return AccessTools.Method(typeof(InventoryBook), nameof(InventoryBook.HasCursor));
+            yield return AccessTools.Method(typeof(KeyboardInput), nameof(KeyboardInput.Reset));
             yield return AccessTools.Constructor(typeof(KickTracker));
             yield return AccessTools.Method(typeof(KickTracker), nameof(KickTracker.ClearPlayer));
             yield return AccessTools.Method(typeof(KickTracker), nameof(KickTracker.CountVotes));
             yield return AccessTools.Method(typeof(KickTracker), nameof(KickTracker.VotesFromNetworkNumber));
-            yield return AccessTools.Method(typeof(KeyboardInput), nameof(KeyboardInput.Reset));
-            yield return AccessTools.Method(typeof(VersusControl), "get_playersLeftToPlace"); 
-
-            yield return AccessTools.Method(typeof(Controller), nameof(Controller.AddPlayer));
-            yield return AccessTools.Method(typeof(ControllerDisconnect), nameof(ControllerDisconnect.SetPromptForPlayer));
-            yield return AccessTools.Method(typeof(GraphScoreBoard), nameof(GraphScoreBoard.SetPlayerCount));
-
-            yield return AccessTools.Method(typeof(InventoryBook), nameof(InventoryBook.HasCursor));
-            yield return AccessTools.Method(typeof(InventoryBook), nameof(InventoryBook.GetCursor));
-            yield return AccessTools.Method(typeof(InventoryBook), nameof(InventoryBook.AddPlayer));
-
+            yield return AccessTools.Method(typeof(LobbyPointCounter), nameof(LobbyPointCounter.handleEvent));
             yield return AccessTools.Method(typeof(PartyBox), nameof(PartyBox.SetPlayerCount));
+            yield return AccessTools.Method(typeof(PickableNetworkButton), nameof(PickableNetworkButton.OnAccept));
+            yield return AccessTools.Method(typeof(PickableNetworkButton), nameof(PickableNetworkButton.Update));
+            yield return AccessTools.Method(typeof(StatTracker), nameof(StatTracker.GetSaveFileDataForLocalPlayer));
+            yield return AccessTools.Method(typeof(StatTracker), nameof(StatTracker.OnLocalPlayerAdded));
+            yield return AccessTools.Method(typeof(StatTracker), nameof(StatTracker.SaveGameForAnimal));
+            yield return AccessTools.Method(typeof(SteamLobbySearchList), nameof(SteamLobbySearchList.checkForListUpdates));
+            yield return AccessTools.Method(typeof(SteamMatchmaker), nameof(SteamMatchmaker.createSocialLobby));
+            yield return AccessTools.Method(typeof(SwitchController), nameof(SwitchController.Reset));
+            yield return AccessTools.Method(typeof(TurnIndicator), nameof(TurnIndicator.SetPlayerCount));
+            yield return AccessTools.Method(typeof(UnityMatchmaker), nameof(UnityMatchmaker.CheckHostConnectivity));
+            yield return AccessTools.Method(typeof(UnityMatchmaker), nameof(UnityMatchmaker.CreateUnityMatch));
+            yield return AccessTools.Method(typeof(VersusControl), "get_playersLeftToPlace");
         }
-        
+
         static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> e)
         {
-            foreach(var inst in e)
+            foreach (var inst in e)
             {
                 if (inst.opcode == OpCodes.Ldc_I4_4)
                 {
-                    inst.opcode = OpCodes.Ldc_I4_8;
+                    inst.opcode = OpCodes.Ldc_I4;
+                    inst.operand = PlayerManager.maxPlayers;
                 }
                 yield return inst;
             }
@@ -65,22 +72,51 @@ namespace MorePlayers
     }
 
     [HarmonyPatch]
-    static class SwitchFirst4For8Patch
+    static class SwitchFirst4ForMaxNumPatch
     {
         static IEnumerable<MethodBase> TargetMethods()
         {
             yield return AccessTools.Method(typeof(PartyBox), nameof(PartyBox.AddPlayer));
+            yield return AccessTools.Method(typeof(LobbySkillTracker), nameof(LobbySkillTracker.RecalculateScores));
         }
-        
+
         static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> e)
         {
             var count = 0;
 
-            foreach(var inst in e)
+            foreach (var inst in e)
             {
                 if (inst.opcode == OpCodes.Ldc_I4_4 && count == 0)
                 {
-                    inst.opcode = OpCodes.Ldc_I4_8;
+                    inst.opcode = OpCodes.Ldc_I4;
+                    inst.operand = PlayerManager.maxPlayers;
+                    count += 1;
+                }
+                yield return inst;
+            }
+        }
+    }
+    [HarmonyPatch]
+    static class SwitchSecond4ForMaxNumPatch
+    {
+        static IEnumerable<MethodBase> TargetMethods()
+        {
+            yield return AccessTools.Method(typeof(LobbySkillTracker), nameof(LobbySkillTracker.UpdateLobbyInfo));
+        }
+
+        static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> e)
+        {
+            var count = 0;
+
+            foreach (var inst in e)
+            {
+                if (inst.opcode == OpCodes.Ldc_I4_4)
+                {
+                    if (count == 1)
+                    {
+                        inst.opcode = OpCodes.Ldc_I4;
+                        inst.operand = PlayerManager.maxPlayers;
+                    }
                     count += 1;
                 }
                 yield return inst;
@@ -90,7 +126,30 @@ namespace MorePlayers
 
 
     [HarmonyPatch]
-    static class Switch3For7Patch
+    static class Switch5ForNumPlusOnePatch
+    {
+        static IEnumerable<MethodBase> TargetMethods()
+        {
+            yield return AccessTools.Method(typeof(SteamMatchmaker), nameof(SteamMatchmaker.OnSteamLobbyJoinRequested));
+            yield return AccessTools.Method(typeof(LobbyManager), nameof(LobbyManager.OnLobbyClientAddPlayerFailed));
+        }
+
+        static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> e)
+        {
+            foreach (var inst in e)
+            {
+                if (inst.opcode == OpCodes.Ldc_I4_4)
+                {
+                    inst.opcode = OpCodes.Ldc_I4;
+                    inst.operand = PlayerManager.maxPlayers + 1;
+                }
+                yield return inst;
+            }
+        }
+    }
+
+    [HarmonyPatch]
+    static class Switch3ForNumMinusOnePatch
     {
         static IEnumerable<MethodBase> TargetMethods()
         {
@@ -99,14 +158,15 @@ namespace MorePlayers
 
             yield return AccessTools.Method(typeof(GraphScoreBoard), nameof(GraphScoreBoard.SetPlayerCharacter));
         }
-        
+
         static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> e)
         {
-            foreach(var inst in e)
+            foreach (var inst in e)
             {
                 if (inst.opcode == OpCodes.Ldc_I4_3)
                 {
-                    inst.opcode = OpCodes.Ldc_I4_7;
+                    inst.opcode = OpCodes.Ldc_I4;
+                    inst.operand = PlayerManager.maxPlayers - 1;
                 }
                 yield return inst;
             }
@@ -118,7 +178,7 @@ namespace MorePlayers
     {
         static void Postfix(ChallengeScoreboard __instance)
         {
-            __instance.players = new ChallengeScoreboard.ChallengePlayer[8];
+            __instance.players = new ChallengeScoreboard.ChallengePlayer[PlayerManager.maxPlayers];
         }
     }
 
@@ -127,7 +187,7 @@ namespace MorePlayers
     {
         static void Postfix(Tablet __instance)
         {
-            __instance.untrackedCursors = new List<PickCursor>(8);
+            __instance.untrackedCursors = new List<PickCursor>(PlayerManager.maxPlayers);
         }
     }
 
@@ -136,7 +196,7 @@ namespace MorePlayers
     {
         static void Postfix(Controller __instance)
         {
-            __instance.associatedChars = new Character.Animals[8];
+            __instance.associatedChars = new Character.Animals[PlayerManager.maxPlayers];
         }
     }
 
@@ -145,7 +205,22 @@ namespace MorePlayers
     {
         static void Postfix(Controller __instance)
         {
-            __instance.associatedChars = new Character.Animals[8];
+            __instance.associatedChars = new Character.Animals[PlayerManager.maxPlayers];
+        }
+    }
+
+    [HarmonyPatch(typeof(Controller), nameof(Controller.RemovePlayer))]
+    static class ControllerRemovePlayerPatch
+    {
+        static void Postfix(Controller __instance, int player)
+        {
+            //not sure what is calculated here ...
+            var num = (15 ^ (1 << player - 1));
+            Debug.Log("ControllerRemovePlayer player" + player);
+            Debug.Log("ControllerRemovePlayer num " + num);
+            Debug.Log("ControllerRemovePlayer this.Player " + (__instance.Player));
+            Debug.Log("ControllerRemovePlayer this.Player &= num " + (__instance.Player &= num));
+            __instance.Player = 0;
         }
     }
 
@@ -154,7 +229,7 @@ namespace MorePlayers
     {
         static void Postfix(GameState __instance)
         {
-            __instance.PlayerScores = new int[8];
+            __instance.PlayerScores = new int[PlayerManager.maxPlayers];
         }
     }
 
@@ -174,7 +249,7 @@ namespace MorePlayers
                 /* add ScorePositions for additional players */
                 GameObject gameObject = UnityEngine.Object.Instantiate<GameObject>(__instance.scoreLinePrefab.gameObject, vector - new Vector3(0f, (float)num * 1.25f, 0f), Quaternion.identity);
                 gameObject.transform.SetParent(__instance.mainParent);
-                gameObject.transform.localScale = Vector3.one;
+                gameObject.transform.localScale = new Vector3(1f, 0.5f, 1f);
                 __instance.playerScoreLines[num] = gameObject.GetComponent<ScoreLine>();
                 __instance.playerScoreLines[num].scoreBoardParent = __instance;
             }
@@ -194,8 +269,8 @@ namespace MorePlayers
         static void Postfix(LevelSelectController __instance)
         {
             Debug.Log("fixed LevelSelectController");
-            __instance.JoinedPlayers = new LobbyPlayer[8];
-            
+            __instance.JoinedPlayers = new LobbyPlayer[PlayerManager.maxPlayers];
+
             if (__instance.PlayerJoinIndicators.Length < PlayerManager.maxPlayers)
             {
                 int num = __instance.PlayerJoinIndicators.Length;
@@ -230,18 +305,38 @@ namespace MorePlayers
     {
         static void Postfix(LobbyPointCounter __instance)
         {
-            __instance.playerJoinedGame = new bool[8];
-            __instance.playerPlayedGame = new bool[8];
-            __instance.playerAFK = new bool[8];
+            __instance.playerJoinedGame = new bool[PlayerManager.maxPlayers];
+            __instance.playerPlayedGame = new bool[PlayerManager.maxPlayers];
+            __instance.playerAFK = new bool[PlayerManager.maxPlayers];
         }
     }
 
-    [HarmonyPatch(typeof(LobbySkillTracker), MethodType.Constructor)]
+    [HarmonyPatch(typeof(LobbyPointCounter), nameof(LobbyPointCounter.Reset))]
+    static class LobbyPointCounterResetCtorPatch
+    {
+        static void Postfix(LobbyPointCounter __instance)
+        {
+            __instance.playerPlayedGame = new bool[PlayerManager.maxPlayers];
+        }
+    }
+
+    [HarmonyPatch(typeof(UnityEngine.Networking.NetworkLobbyManager), MethodType.Constructor)]
+    static class NetworkLobbyManagerCtorPatch
+    {
+        static void Postfix(UnityEngine.Networking.NetworkLobbyManager __instance)
+        {
+            __instance.maxPlayers = PlayerManager.maxPlayers;
+        }
+    }
+
+
+    [HarmonyPatch(typeof(LobbySkillTracker), nameof(LobbySkillTracker.Start))]
     static class LobbySkillTrackerCtorPatch
     {
         static void Postfix(LobbySkillTracker __instance)
         {
-            __instance.ratings = new Moserware.Skills.Rating[8];
+            Debug.Log("LobbySkillTracker patch " + __instance.ratings.Length);
+            __instance.ratings = new Moserware.Skills.Rating[PlayerManager.maxPlayers];
         }
     }
 
@@ -250,9 +345,9 @@ namespace MorePlayers
     {
         static void Postfix(VersusControl __instance)
         {
-            Debug.Log("patch VersusControl");
-            __instance.winOrder = new GamePlayer[8];
-            __instance.RemainingPlacements = new int[8];
+            Debug.Log("patch VersusControl " + PlayerManager.maxPlayers);
+            __instance.winOrder = new GamePlayer[PlayerManager.maxPlayers];
+            __instance.RemainingPlacements = new int[PlayerManager.maxPlayers];
         }
     }
 
@@ -262,7 +357,7 @@ namespace MorePlayers
         static void Postfix(LobbyManager __instance)
         {
             Debug.Log("LobbyManager.instance.lobbySlots " + __instance.lobbySlots.Length);
-            
+
             __instance.maxPlayers = PlayerManager.maxPlayers;
             __instance.maxPlayersPerConnection = PlayerManager.maxPlayers;
 
@@ -295,13 +390,11 @@ namespace MorePlayers
         }
     }
 
-
     [HarmonyPatch(typeof(InventoryBook), nameof(InventoryBook.AddPlayer))]
     static class InventoryBookCtorPatch
     {
         static void Prefix(InventoryBook __instance)
         {
-            Debug.Log("InventoryBook cursorSpawnLocation fix");
             if (__instance.cursorSpawnLocation.Length < PlayerManager.maxPlayers)
             {
                 int num2 = __instance.cursorSpawnLocation.Length;
@@ -312,33 +405,38 @@ namespace MorePlayers
                 }
 
             }
-
-            //cursorSpawnLocation
+            Debug.Log("InventoryBook cursorSpawnLocation patched");
         }
     }
-    
 
-    [HarmonyPatch(typeof(ControllerDisconnect), MethodType.Constructor)]
+    [HarmonyPatch(typeof(ControllerDisconnect), nameof(ControllerDisconnect.Start))]
     static class ControllerDisconnectCtorPatch
     {
         static void Prefix(ControllerDisconnect __instance)
         {
+            var oglen = __instance.ConnectPrompts.Length;
             Array.Resize<XboxReconnectPrompt>(ref __instance.ConnectPrompts, PlayerManager.maxPlayers);
-            __instance.orphanedReceivers = new List<InputReceiver>[]
+
+            for (var i = oglen; i < PlayerManager.maxPlayers; i++)
             {
-                new List<InputReceiver>(),
-                new List<InputReceiver>(),
-                new List<InputReceiver>(),
-                new List<InputReceiver>(),
-                new List<InputReceiver>(),
-                new List<InputReceiver>(),
-                new List<InputReceiver>()
-            };
-            //___showingPrompts = new bool[PlayerManager.maxPlayers];
+                __instance.ConnectPrompts[i] = __instance.ConnectPrompts[0];
+            }
+
+            if (__instance.orphanedReceivers.Length != PlayerManager.maxPlayers)
+            {
+                var og_len = __instance.orphanedReceivers.Length;
+                Array.Resize(ref __instance.orphanedReceivers, PlayerManager.maxPlayers);
+                for (var i = og_len; i < __instance.orphanedReceivers.Length; i++)
+                {
+                    __instance.orphanedReceivers[i] = new List<InputReceiver>();
+                }
+            }
+            ControllerDisconnect.showingPrompts = new bool[PlayerManager.maxPlayers];
             __instance.orphanedCharacters = new Character.Animals[PlayerManager.maxPlayers][];
+
+            Debug.Log("ControllerDisconnect patched");
         }
     }
-
 
     [HarmonyPatch(typeof(InputManager), "get_EnableNativeInput")]
     static class InputManagerCtorPatch
@@ -347,6 +445,87 @@ namespace MorePlayers
         {
             Debug.Log("InputManager.EnableNativeInput");
             __result = true;
+        }
+    }
+
+    [HarmonyPatch(typeof(LevelPortal), nameof(LevelPortal.Awake))]
+    static class LevelPortalCtorPatch
+    {
+        static void Prefix(LevelPortal __instance)
+        {
+            VoteArrow[] componentsInChildren = __instance.GetComponentsInChildren<VoteArrow>();
+            Debug.Log("VoteArrows " + componentsInChildren.Length);
+            if (componentsInChildren.Length != PlayerManager.maxPlayers)
+            {
+                int num = componentsInChildren.Length;
+
+                for (int j = num; j < PlayerManager.maxPlayers; j++)
+                {
+                    Type type = componentsInChildren[3].GetType();
+                    VoteArrow voteArrow2 = componentsInChildren[3].gameObject.AddComponent(type) as VoteArrow;
+                    foreach (FieldInfo fieldInfo in type.GetFields())
+                    {
+                        fieldInfo.SetValue(voteArrow2, fieldInfo.GetValue(componentsInChildren[3]));
+                    }
+                }
+            }
+        }
+    }
+
+    [HarmonyPatch(typeof(StatTracker), MethodType.Constructor)]
+    static class StatTrackerCtorPatch
+    {
+        static void Postfix(StatTracker __instance)
+        {
+            Debug.Log("patch StatTracker " + PlayerManager.maxPlayers);
+            __instance.saveFiles = new SaveFileData[PlayerManager.maxPlayers];
+            __instance.saveStatuses = new StatTracker.SaveFileStatus[PlayerManager.maxPlayers];
+        }
+    }
+
+    [HarmonyPatch(typeof(GamesparksMatchmakingLobby), nameof(GamesparksMatchmakingLobby.SetPlayerCount))]
+    static class GamesparksMatchmakingLobbyCtorPatch
+    {
+        static void Prefix(ref int playerCount)
+        {
+            Debug.Log("GamesparksMatchmakingLobby playerCount " + playerCount);
+            //We have no more than 3 players on our server, you can trust us ...
+            if (playerCount > 3)
+            {
+                playerCount = 3;
+            }
+        }
+    }
+
+    [HarmonyPatch(typeof(SteamMatchmakingLobby), nameof(SteamMatchmakingLobby.SetPlayerCount))]
+    static class SteamMatchmakingLobbyCtorPatch
+    {
+        static void Prefix(ref int playerCount)
+        {
+            Debug.Log("SteamMatchmakingLobby playerCount " + playerCount);
+            //We have no more than 3 players on our server, you can trust us ...
+            if (playerCount > 3)
+            {
+                playerCount = 3;
+            }
+        }
+    }
+
+    [HarmonyPatch(typeof(LivesDisplayController), nameof(LivesDisplayController.Initialize))]
+    static class LivesDisplayControllerCtorPatch
+    {
+        static void Prefix(LivesDisplayController __instance)
+        {
+            Debug.Log("LivesDisplayController patch " + __instance.livesDisplayBoxes.Count);
+            if (__instance.livesDisplayBoxes.Count < PlayerManager.maxPlayers)
+            {
+                var og_len = __instance.livesDisplayBoxes.Count;
+                for (var i = og_len; i <= PlayerManager.maxPlayers; i++)
+                {
+                    __instance.livesDisplayBoxes.Add(__instance.livesDisplayBoxes[0]);
+                }
+
+            }
         }
     }
 }
