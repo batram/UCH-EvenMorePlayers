@@ -53,6 +53,7 @@ class Controller
   [DD] JoinedPlayers = new LobbyPlayer[4];
   [DD] PlayerJoinIndicators                                 map indicators to 0..3, we reuse existing 4 indicators for multiple players 
   [DD] CursorSpawnPoint		                                  map cursor spawn points to 0..3 (TODO: add new positions)
+  [DD] UndergroundCharacterPosition                         map cursor spawn points to 0..3 (TODO: add new positions)
   
   
 [DD] class LobbyPointCounter
@@ -169,3 +170,9 @@ class PickableNetworkButton
 
 [DD] class LivesDisplayController
   [DD] livesDisplayBoxes                                    not enough livesDisplayBoxes for more than 8 players ...
+
+
+[DD] class PlayerStatusDisplay
+  [DD] public StatusSlot[] Slots                            not enough Slots for more than 4 players (Challenge mode)
+  [DD] function SetSlotCount                                hardcoded 4
+

@@ -9,7 +9,7 @@ using UnityEngine;
 
 namespace MorePlayers
 {
-    [BepInPlugin("notfood.MorePlayers", "EvenMorePlayers", "0.0.0.1")]
+    [BepInPlugin("notfood.MorePlayers", "EvenMorePlayers", "0.0.0.2")]
     public class MorePlayersMod : BaseUnityPlugin
     {
         void Awake()
@@ -45,6 +45,7 @@ namespace MorePlayers
             yield return AccessTools.Method(typeof(PartyBox), nameof(PartyBox.SetPlayerCount));
             yield return AccessTools.Method(typeof(PickableNetworkButton), nameof(PickableNetworkButton.OnAccept));
             yield return AccessTools.Method(typeof(PickableNetworkButton), nameof(PickableNetworkButton.Update));
+            yield return AccessTools.Method(typeof(PlayerStatusDisplay), nameof(PlayerStatusDisplay.SetSlotCount));
             yield return AccessTools.Method(typeof(StatTracker), nameof(StatTracker.GetSaveFileDataForLocalPlayer));
             yield return AccessTools.Method(typeof(StatTracker), nameof(StatTracker.OnLocalPlayerAdded));
             yield return AccessTools.Method(typeof(StatTracker), nameof(StatTracker.SaveGameForAnimal));
@@ -296,6 +297,20 @@ namespace MorePlayers
                 }
             }
 
+            Debug.Log("UndergroundCharacterPosition.Length " + __instance.UndergroundCharacterPosition.Length);
+            if (__instance.UndergroundCharacterPosition.Length < PlayerManager.maxPlayers)
+            {
+                int num = __instance.UndergroundCharacterPosition.Length;
+                Array.Resize(ref __instance.UndergroundCharacterPosition, PlayerManager.maxPlayers);
+                for (int i = num; i < __instance.UndergroundCharacterPosition.Length; i++)
+                {
+                    /* map UndergroundCharacterPosition to 0..3
+						TODO: add new positions
+					 */
+                    __instance.UndergroundCharacterPosition[i] = __instance.UndergroundCharacterPosition[i % num];
+                }
+            }
+
         }
 
     }
@@ -523,6 +538,27 @@ namespace MorePlayers
                 for (var i = og_len; i <= PlayerManager.maxPlayers; i++)
                 {
                     __instance.livesDisplayBoxes.Add(__instance.livesDisplayBoxes[0]);
+                }
+
+            }
+        }
+    }
+
+    [HarmonyPatch(typeof(PlayerStatusDisplay), nameof(PlayerStatusDisplay.SetupSlot))]
+    [HarmonyPatch(typeof(PlayerStatusDisplay), nameof(PlayerStatusDisplay.SetSlot))]
+    [HarmonyPatch(typeof(PlayerStatusDisplay), nameof(PlayerStatusDisplay.SetSlotCount))]
+    static class PlayerStatusDisplaySetSlotCountCtorPatch
+    {
+        static void Prefix(PlayerStatusDisplay __instance)
+        {
+            Debug.Log("PlayerStatusDisplay patch " + __instance.Slots.Length);
+            if (__instance.Slots.Length < PlayerManager.maxPlayers)
+            {
+                var og_len = __instance.Slots.Length;
+                Array.Resize<StatusSlot>(ref __instance.Slots, PlayerManager.maxPlayers);
+                for (var i = og_len; i < PlayerManager.maxPlayers; i++)
+                {
+                    __instance.Slots[i] = __instance.Slots[0];
                 }
 
             }
