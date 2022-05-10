@@ -91,6 +91,7 @@ class Controller
   [DD] RemainingPlacements = new int[4];                       
       
   [DD] function VersusControl.playersLeftToPlace            hardcoded 4 comparison
+  [DD] function ShuffleStartPosition                        fails for larger amount of players (integer overflow???)
 
 
 [DD] class SteamMatchmaker

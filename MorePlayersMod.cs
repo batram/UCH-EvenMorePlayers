@@ -9,12 +9,12 @@ using UnityEngine;
 
 namespace MorePlayers
 {
-    [BepInPlugin("notfood.MorePlayers", "EvenMorePlayers", "0.0.0.2")]
+    [BepInPlugin("notfood.MorePlayers", "EvenMorePlayers", "0.0.0.3")]
     public class MorePlayersMod : BaseUnityPlugin
     {
         void Awake()
         {
-            PlayerManager.maxPlayers = 8;
+            PlayerManager.maxPlayers = 11;
 
             new Harmony("notfood.UltimateBuilder").PatchAll();
 
@@ -564,4 +564,23 @@ namespace MorePlayers
             }
         }
     }
+
+    [HarmonyPatch(typeof(VersusControl), nameof(VersusControl.ShuffleStartPosition))]
+    static class VersusControlxCtorPatch
+    {
+        static void Postfix(VersusControl __instance)
+        {
+            Debug.Log("check VersusControl RandomStartPositionString " + __instance.RandomStartPositionString + " Length " + __instance.RandomStartPositionString.Length);
+            var rstr = "";
+            for (int j = 0; j < __instance.PlayerQueue.Count; j++)
+            {
+                int rando = UnityEngine.Random.Range(0, 8);
+                rstr += rando.ToString();
+            }
+
+            __instance.NetworkRandomStartPositionString = rstr;
+            Debug.Log("check VersusControl RandomStartPositionString " + __instance.RandomStartPositionString + " Length " + __instance.RandomStartPositionString.Length);
+        }
+    }
+
 }
