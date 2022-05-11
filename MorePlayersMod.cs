@@ -6,15 +6,17 @@ using System.Collections.Generic;
 using System.Reflection;
 using System.Reflection.Emit;
 using UnityEngine;
+using UnityEngine.Networking;
+using UnityEngine.Networking.Match;
 
 namespace MorePlayers
 {
-    [BepInPlugin("notfood.MorePlayers", "EvenMorePlayers", "0.0.0.3")]
+    [BepInPlugin("notfood.MorePlayers", "EvenMorePlayers", "0.0.0.4")]
     public class MorePlayersMod : BaseUnityPlugin
     {
         void Awake()
         {
-            PlayerManager.maxPlayers = 11;
+            PlayerManager.maxPlayers = 100;
 
             new Harmony("notfood.UltimateBuilder").PatchAll();
 
@@ -507,7 +509,7 @@ namespace MorePlayers
             //We have no more than 3 players on our server, you can trust us ...
             if (playerCount > 3)
             {
-                playerCount = 3;
+                playerCount = 1;
             }
         }
     }
@@ -521,10 +523,22 @@ namespace MorePlayers
             //We have no more than 3 players on our server, you can trust us ...
             if (playerCount > 3)
             {
-                playerCount = 3;
+                playerCount = 1;
             }
         }
     }
+
+
+    [HarmonyPatch(typeof(GameSparksQuery), nameof(GameSparksQuery.DoGetLobbyData))]
+    static class GameSparksQueryLobbyCtorPatch
+    {
+        static void Prefix(ref bool reserveSlot)
+        {
+            Debug.Log("reserveSlot " + reserveSlot);
+            reserveSlot = false;
+        }
+    }
+
 
     [HarmonyPatch(typeof(LivesDisplayController), nameof(LivesDisplayController.Initialize))]
     static class LivesDisplayControllerCtorPatch
@@ -582,5 +596,14 @@ namespace MorePlayers
             Debug.Log("check VersusControl RandomStartPositionString " + __instance.RandomStartPositionString + " Length " + __instance.RandomStartPositionString.Length);
         }
     }
-    
+
+    [HarmonyPatch(typeof(NetworkManager), nameof(NetworkManager.StartServer), new Type[] { typeof(MatchInfo), typeof(ConnectionConfig), typeof(int) })]
+    static class NetworkManagerCtorPatch
+    {
+        static void Prefix(NetworkManager __instance, int maxConnections)
+        {
+            Debug.Log("NetworkManager StartServer " + __instance.maxConnections + " param maxConnections " + maxConnections);
+            __instance.maxConnections = PlayerManager.maxPlayers;
+        }
+    }
 }

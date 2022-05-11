@@ -177,3 +177,7 @@ class PickableNetworkButton
   [DD] public StatusSlot[] Slots                            not enough Slots for more than 4 players (Challenge mode)
   [DD] function SetSlotCount                                hardcoded 4
 
+
+[DD] class NetworkManager
+  [DD] private int m_MaxConnections = 4                     would only allow 5 players (host + 4 external) // patched via maxConnections
+
