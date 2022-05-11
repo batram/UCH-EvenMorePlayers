@@ -44,7 +44,6 @@ namespace MorePlayers
             yield return AccessTools.Method(typeof(LobbyPointCounter), nameof(LobbyPointCounter.handleEvent));
             yield return AccessTools.Method(typeof(PartyBox), nameof(PartyBox.SetPlayerCount));
             yield return AccessTools.Method(typeof(PickableNetworkButton), nameof(PickableNetworkButton.OnAccept));
-            yield return AccessTools.Method(typeof(PickableNetworkButton), nameof(PickableNetworkButton.Update));
             yield return AccessTools.Method(typeof(PlayerStatusDisplay), nameof(PlayerStatusDisplay.SetSlotCount));
             yield return AccessTools.Method(typeof(StatTracker), nameof(StatTracker.GetSaveFileDataForLocalPlayer));
             yield return AccessTools.Method(typeof(StatTracker), nameof(StatTracker.OnLocalPlayerAdded));
@@ -79,6 +78,7 @@ namespace MorePlayers
         {
             yield return AccessTools.Method(typeof(PartyBox), nameof(PartyBox.AddPlayer));
             yield return AccessTools.Method(typeof(LobbySkillTracker), nameof(LobbySkillTracker.RecalculateScores));
+            yield return AccessTools.Method(typeof(PickableNetworkButton), nameof(PickableNetworkButton.Update));
         }
 
         static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> e)
@@ -582,5 +582,5 @@ namespace MorePlayers
             Debug.Log("check VersusControl RandomStartPositionString " + __instance.RandomStartPositionString + " Length " + __instance.RandomStartPositionString.Length);
         }
     }
-
+    
 }

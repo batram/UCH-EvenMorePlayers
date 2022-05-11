@@ -105,7 +105,7 @@ class Controller
   
 class PickableNetworkButton
   [DD] function OnAccept                                    hardcoded 4 //this.NumberOfPlayersInSocialLobby < 4 
-  [DD] function Update                                      hardcoded 4 
+  [DD] function Update                                      hardcoded 4 // !!carefull invite code also checks 4 
   function SetSearchResultInfo                              hardcoded 4 in string ... //max number of players displayed
 
 
