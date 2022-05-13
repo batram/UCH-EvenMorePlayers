@@ -14,7 +14,7 @@ namespace MorePlayers
     [BepInPlugin("notfood.MorePlayers", "EvenMorePlayers", "0.0.0.5")]
     public class MorePlayersMod : BaseUnityPlugin
     {
-        public static bool fullDebug = true;
+        public static bool fullDebug = false;
 
         void Awake()
         {
