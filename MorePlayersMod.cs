@@ -11,14 +11,16 @@ using UnityEngine.Networking.Match;
 
 namespace MorePlayers
 {
-    [BepInPlugin("notfood.MorePlayers", "EvenMorePlayers", "0.0.0.4")]
+    [BepInPlugin("notfood.MorePlayers", "EvenMorePlayers", "0.0.0.5")]
     public class MorePlayersMod : BaseUnityPlugin
     {
+        public static bool fullDebug = true;
+
         void Awake()
         {
             PlayerManager.maxPlayers = 100;
 
-            new Harmony("notfood.UltimateBuilder").PatchAll();
+            new Harmony("notfood.MorePlayers").PatchAll();
 
             Debug.Log("[MorePlayersMod] started.");
             Debug.Log("[GameSettings.GetInstance().MaxPlayers] " + GameSettings.GetInstance().MaxPlayers + "; [PlayerManager.maxPlayers] " + PlayerManager.maxPlayers);
@@ -312,9 +314,7 @@ namespace MorePlayers
                     __instance.UndergroundCharacterPosition[i] = __instance.UndergroundCharacterPosition[i % num];
                 }
             }
-
         }
-
     }
 
     [HarmonyPatch(typeof(LobbyPointCounter), MethodType.Constructor)]
@@ -506,10 +506,21 @@ namespace MorePlayers
         static void Prefix(ref int playerCount)
         {
             Debug.Log("GamesparksMatchmakingLobby playerCount " + playerCount);
-            //We have no more than 3 players on our server, you can trust us ...
-            if (playerCount > 3)
+
+            if (GameSettings.GetInstance().lobbyPrivacy == MatchmakingLobby.Visibility.PUBLIC)
             {
-                playerCount = 1;
+                //We are always full in public matches, so no one joins on accident
+                if (playerCount > 3)
+                {
+                    playerCount = 4;
+                }
+            }
+            else {
+                //We have no more than 3 players on our server, you can trust us ...
+                if (playerCount > 3)
+                {
+                    playerCount = 1;
+                }
             }
         }
     }
@@ -520,10 +531,22 @@ namespace MorePlayers
         static void Prefix(ref int playerCount)
         {
             Debug.Log("SteamMatchmakingLobby playerCount " + playerCount);
-            //We have no more than 3 players on our server, you can trust us ...
-            if (playerCount > 3)
+
+            if (GameSettings.GetInstance().lobbyPrivacy == MatchmakingLobby.Visibility.PUBLIC)
             {
-                playerCount = 1;
+                //We are always full in public matches, so no one joins on accident
+                if (playerCount > 3)
+                {
+                    playerCount = 4;
+                }
+            }
+            else
+            {
+                //We have no more than 3 players on our server, you can trust us ...
+                if (playerCount > 3)
+                {
+                    playerCount = 1;
+                }
             }
         }
     }
@@ -538,7 +561,6 @@ namespace MorePlayers
             reserveSlot = false;
         }
     }
-
 
     [HarmonyPatch(typeof(LivesDisplayController), nameof(LivesDisplayController.Initialize))]
     static class LivesDisplayControllerCtorPatch
