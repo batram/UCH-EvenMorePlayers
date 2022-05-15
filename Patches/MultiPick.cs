@@ -41,6 +41,7 @@ namespace MorePlayers
             {
                 c.enabled = true;
             }
+            __instance.RefreshScale();
         }
     }
 
@@ -92,6 +93,32 @@ namespace MorePlayers
         {
             Debug.Log("LevelSelectController.IsCharacterTaken false");
             __result = false;
+        }
+    }
+
+    [HarmonyPatch(typeof(Modifiers), nameof(Modifiers.OnModifiersDynamicChange))]
+    static class ModifiersCtorPatch
+    {
+        static bool Prefix(Modifiers __instance)
+        {
+            Debug.Log("Modifiers.OnModifiersDynamicChange: fix size modifier " + __instance.CharacterScale + " " + Modifiers.GetInstance().CharacterScaleAudioStateString);
+            if (LobbyManager.instance != null && LobbyManager.instance.CurrentLevelSelectController)
+            {
+                __instance.modsApplied = __instance.modsPreview;
+                LobbyManager.instance.CurrentLevelSelectController.RefreshCharacterPosition();
+            }
+            if (LobbyManager.instance != null && (LobbyManager.instance.CurrentGameController != null || LobbyManager.instance.CurrentLevelSelectController != null))
+            {
+                Character[] array = UnityEngine.Object.FindObjectsOfType<Character>();
+                for (int i = 0; i < array.Length; i++)
+                {
+                    array[i].RefreshScale();
+                }
+                Time.timeScale = __instance.GameSpeed;
+            }
+            AkSoundEngine.PostEvent(__instance.RateOfFireAudioEventStrings[__instance.RateOfFireMode], LobbyManager.instance.gameObject);
+
+            return false;
         }
     }
 }
