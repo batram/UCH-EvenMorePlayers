@@ -1,5 +1,6 @@
 using HarmonyLib;
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Networking;
 
@@ -76,13 +77,77 @@ namespace MorePlayers
         }
     }
 
+
     [HarmonyPatch(typeof(OutfitManager), nameof(OutfitManager.RebuildDatabase))]
     static class OutfitManagerRebuildDatabaseTakenCtorPatch
     {
-        static bool Prefix()
+        static bool Prefix(OutfitManager __instance)
         {
-            Debug.Log("OutfitManager.RebuildDatabase: Skip broken function for now");
+            Debug.Log("OutfitManager.RebuildDatabase: fix");
+
+            __instance.characterOutfitsUnlocked.Clear();
+            __instance.characterOutfitsAll.Clear();
+            __instance.characterArtMatchers = UnityEngine.Object.FindObjectsOfType<ArtMatcher>();
+            foreach (ArtMatcher artMatcher in __instance.characterArtMatchers)
+            {
+                if (artMatcher.character.name.Contains("Clone") && !artMatcher.character.name.Contains("moep") && artMatcher.character.GetComponent<NetworkIdentity>())
+                {
+                    artMatcher.character.name += " moep " + artMatcher.character.GetComponent<NetworkIdentity>().netId;
+                }
+
+                if (!__instance.characterOutfitsUnlocked.ContainsKey(artMatcher.character))
+                {
+                    __instance.characterOutfitsUnlocked.Add(artMatcher.character, new List<Outfit>[Outfit.NumOutfitTypes]);
+                }
+                else
+                {
+                    Debug.Log("OutfitManager.RebuildDatabase: dupe key " + artMatcher.character);
+                }
+                if (!__instance.characterOutfitsAll.ContainsKey(artMatcher.character))
+                {
+                    __instance.characterOutfitsAll.Add(artMatcher.character, new List<Outfit>[Outfit.NumOutfitTypes]);
+                }
+                else
+                {
+                    Debug.Log("OutfitManager.RebuildDatabase: dupe key " + artMatcher.character);
+                }
+                for (int j = 0; j < Outfit.NumOutfitTypes; j++)
+                {
+                    __instance.characterOutfitsUnlocked[artMatcher.character][j] = new List<Outfit>();
+                    __instance.characterOutfitsAll[artMatcher.character][j] = new List<Outfit>();
+                }
+
+                Debug.Log("artMatcher.character" + artMatcher.character + "artMatcher.outfits " + artMatcher.outfits.Length);
+
+                foreach (Outfit outfit in artMatcher.outfits)
+                {
+                    if (outfit.outfitType != Outfit.OutfitType.FollowOutfit && outfit.outfitType != Outfit.OutfitType.Zombie)
+                    {
+                        __instance.characterOutfitsAll[artMatcher.character][(int)outfit.outfitType].Add(outfit);
+                        bool flag = outfit.Unlocked;
+                        if (!flag && artMatcher.GetDefaultForcedOutfit(outfit.outfitType) == outfit)
+                        {
+                            outfit.TempUnlocked = true;
+                            flag = true;
+                        }
+                        if (flag)
+                        {
+                            __instance.characterOutfitsUnlocked[artMatcher.character][(int)outfit.outfitType].Add(outfit);
+                        }
+                    }
+                }
+            }
+
             return false;
+        }
+    }
+
+    [HarmonyPatch(typeof(OutfitController), nameof(OutfitController.updateImages))]
+    static class OutfitControllerupdateImagesCtorPatch
+    {
+        static void Prefix(OutfitController __instance)
+        {
+            __instance.OutfitManager.RebuildDatabase();
         }
     }
 
