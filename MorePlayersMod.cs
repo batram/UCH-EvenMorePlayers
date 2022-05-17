@@ -11,7 +11,7 @@ using UnityEngine.Networking.Match;
 
 namespace MorePlayers
 {
-    [BepInPlugin("notfood.MorePlayers", "EvenMorePlayers", "0.0.0.5")]
+    [BepInPlugin("notfood.MorePlayers", "EvenMorePlayers", "0.0.0.6")]
     public class MorePlayersMod : BaseUnityPlugin
     {
         public static bool fullDebug = false;

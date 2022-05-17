@@ -72,54 +72,6 @@ namespace MorePlayers
         }
     }
 
-    [HarmonyPatch(typeof(LevelSelectController), nameof(LevelSelectController.SetupLobbyAfterWait))]
-    static class LevelSelectControllerSetupLobbyAfterWaitCtorPatch
-    {
-        static void Prefix(LevelSelectController __instance)
-        {
-            if (!LobbyManager.instance)
-            {
-                return;
-            }
-            foreach (LobbyPlayer lobbyPlayer in LobbyManager.instance.lobbySlots)
-            {
-                if (!(lobbyPlayer == null))
-                {
-                    if (!lobbyPlayer.IsLocalPlayer)
-                    {
-                        lobbyPlayer.FindLobbyObjects();
-                    }
-
-                    try
-                    {
-                        lobbyPlayer.UnpickCharacter();
-                    }
-                    catch (Exception e)
-                    {
-                        Debug.Log("unpick ex: " + e);
-                    }
-                }
-            }
-
-            foreach (Character car in UnityEngine.Object.FindObjectsOfType<Character>())
-            {
-                if (car.picked == false)
-                {
-                    car.SetOutfitsFromArray(new int[] { -1, -1, -1, -1, -1, -1 });
-                    foreach (SpriteRenderer spi in car.sprite.GetComponentsInChildren<SpriteRenderer>())
-                    {
-                        if (spi.name.EndsWith("_") && spi.name != "Skate_")
-                        {
-                            UnityEngine.Object.Destroy(spi.gameObject);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-
-
     [HarmonyPatch(typeof(OutfitManager), nameof(OutfitManager.RebuildDatabase))]
     static class OutfitManagerRebuildDatabaseTakenCtorPatch
     {
@@ -307,6 +259,21 @@ namespace MorePlayers
             AkSoundEngine.PostEvent(__instance.RateOfFireAudioEventStrings[__instance.RateOfFireMode], LobbyManager.instance.gameObject);
 
             return false;
+        }
+    }
+
+    [HarmonyPatch(typeof(LobbyPlayer), nameof(LobbyPlayer.DoCharacterPickedEvent))]
+    static class LobbyPlayerDoCharacterPickedEventCtorPatch
+    {
+        static bool Prefix(LobbyPlayer __instance, bool clearOutfit)
+        {
+            //unpick character in LevelSelectController.setupController
+            if (!clearOutfit)
+            {
+                __instance.UnpickCharacter();
+                return false;
+            }
+            return true;
         }
     }
 }
