@@ -14,14 +14,29 @@ namespace MorePlayers
             GameObject gameObject = NetworkServer.FindLocalObject(new NetworkInstanceId(characterNetID));
             if (gameObject != null)
             {
-                Character component = gameObject.GetComponent<Character>();
+                Character[] components = gameObject.GetComponents<Character>();
 
-                if (component != null)
+                if (components.Length == 1)
                 {
+                    Character component = components[0];
+                    var parent = component.transform.parent;
+
                     Character car = UnityEngine.Object.Instantiate<Character>(component, component.transform.position, Quaternion.identity);
                     car.GetComponent<NetworkIdentity>().ForceSceneId(0);
                     Debug.Log("car picked: " + car.picked);
                     car.picked = false;
+                    car.transform.parent = parent;
+                    component.transform.parent = null;
+
+                    var arties = component.GetComponentsInChildren<ArtMatcher>();
+                    Debug.Log("ArtMatcher " + arties.Length);
+                    if (arties.Length > 1)
+                    {
+                        for (var i = 0; i < arties.Length - 1; i++)
+                        {
+                            UnityEngine.Object.Destroy(arties[i].gameObject);
+                        }
+                    }
                     foreach (BoxCollider2D c in car.gameObject.GetComponents<BoxCollider2D>())
                     {
                         c.enabled = true;
@@ -29,6 +44,17 @@ namespace MorePlayers
                     NetworkServer.Spawn(car.gameObject);
                 }
             }
+        }
+    }
+
+    [HarmonyPatch(typeof(LevelSelectController), nameof(LevelSelectController.RpcResetCharacter))]
+    static class LevelSelectControllerRpcResetCharacterCtorPatch
+    {
+        static void Postfix(GameObject characterObj)
+        {
+            //Bug on return to lobby
+            //NetworkServer.Destroy(characterObj);
+            //UnityEngine.Object.Destroy(characterObj);
         }
     }
 
@@ -74,8 +100,24 @@ namespace MorePlayers
                     }
                 }
             }
+
+            foreach (Character car in UnityEngine.Object.FindObjectsOfType<Character>())
+            {
+                if (car.picked == false)
+                {
+                    car.SetOutfitsFromArray(new int[] { -1, -1, -1, -1, -1, -1 });
+                    foreach (SpriteRenderer spi in car.sprite.GetComponentsInChildren<SpriteRenderer>())
+                    {
+                        if (spi.name.EndsWith("_") && spi.name != "Skate_")
+                        {
+                            UnityEngine.Object.Destroy(spi.gameObject);
+                        }
+                    }
+                }
+            }
         }
     }
+
 
 
     [HarmonyPatch(typeof(OutfitManager), nameof(OutfitManager.RebuildDatabase))]
@@ -148,6 +190,87 @@ namespace MorePlayers
         static void Prefix(OutfitController __instance)
         {
             __instance.OutfitManager.RebuildDatabase();
+        }
+    }
+
+
+    [HarmonyPatch(typeof(Character), nameof(Character.GetOutfitsAsArray))]
+    static class GetOutfitsAsArrayCtorPatch
+    {
+        static void Postfix(Character __instance, ref int[] __result)
+        {
+            Debug.Log("Character.GetOutfitsAsArray " + __instance + " netid: " + __instance.GetComponent<NetworkIdentity>().netId);
+            Array.Resize<int>(ref __result, __result.Length + 1);
+            __result[__result.Length - 1] = (int)__instance.GetComponent<NetworkIdentity>().netId.Value;
+        }
+    }
+
+    [HarmonyPatch(typeof(Character), nameof(Character.SetOutfitsFromArray), new Type[] { typeof(SyncListInt) })]
+    static class SetOutfitsFromArraySyncListIntCtorPatch
+    {
+        static bool Prefix(Character __instance, SyncListInt outfitsSyncList)
+        {
+            Debug.Log("Character.SetOutfitsFromArray " + outfitsSyncList.Count);
+            if (outfitsSyncList.Count == 7)
+            {
+                int[] array = new int[Outfit.NumOutfitTypes + 1];
+                for (int i = 0; i < Outfit.NumOutfitTypes; i++)
+                {
+                    if (outfitsSyncList.Count > i)
+                    {
+                        array[i] = outfitsSyncList[i];
+                    }
+                    else
+                    {
+                        array[i] = -1;
+                    }
+                }
+                __instance.SetOutfitsFromArray(array);
+                return false;
+            }
+            return true;
+        }
+    }
+
+
+
+
+    [HarmonyPatch(typeof(Character), nameof(Character.SetOutfitsFromArray), new Type[] { typeof(int[]) })]
+    static class SetOutfitsFromArrayCtorPatch
+    {
+        static bool Prefix(Character __instance, int[] outfitsArray)
+        {
+            Debug.Log("Character.SetOutfitsFromArray " + outfitsArray.Length);
+            if (outfitsArray.Length == 7)
+            {
+                foreach (Character car in UnityEngine.Object.FindObjectsOfType<Character>())
+                {
+                    if (car.GetComponent<NetworkIdentity>().netId.Value == outfitsArray[6])
+                    {
+                        Outfit[] componentsInChildren = car.GetComponentsInChildren<Outfit>();
+                        for (int num = 0; num != componentsInChildren.Length; num++)
+                        {
+                            Outfit outfit = componentsInChildren[num];
+                            if (outfit.outfitType != Outfit.OutfitType.FollowOutfit && outfit.outfitType != Outfit.OutfitType.Zombie)
+                            {
+                                int outfitType = (int)outfit.outfitType;
+                                outfit.on = outfitsArray[outfitType] != -1 && num == outfitsArray[outfitType];
+                                if (outfit.on && !outfit.Unlocked)
+                                {
+                                    outfit.TempUnlocked = true;
+                                }
+                            }
+                        }
+                        car.OnOutfitsUpdated(componentsInChildren);
+                        if (__instance.hasAuthority)
+                        {
+                            car.TellEverybodyAboutOutfits();
+                        }
+                        return false;
+                    }
+                }
+            }
+            return true;
         }
     }
 
