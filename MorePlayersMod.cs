@@ -9,6 +9,9 @@ using UnityEngine;
 using UnityEngine.Networking;
 using UnityEngine.Networking.Match;
 
+[assembly: AssemblyVersion("0.0.0.6")]
+[assembly: AssemblyInformationalVersion("0.0.0.6")]
+
 namespace MorePlayers
 {
     [BepInPlugin("notfood.MorePlayers", "EvenMorePlayers", "0.0.0.6")]
