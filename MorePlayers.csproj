@@ -49,7 +49,7 @@
       <Private>False</Private>
     </Reference>
     <Reference Include="UnityEngine.Physics2DModule">
-      <HintPath>..\Ultim8_mod\Ultim8_mod\libs\chicken\UnityEngine.Physics2DModule.dll</HintPath>
+      <HintPath>$(UCHfolder)\UltimateChickenHorse_Data\UnityEngine.Physics2DModule.dll</HintPath>
     </Reference>
     <Reference Include="UnityEngine.UI">
       <HintPath>$(UCHfolder)\UltimateChickenHorse_Data\Managed\UnityEngine.UI.dll</HintPath>
