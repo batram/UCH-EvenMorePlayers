@@ -1,45 +1,83 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Microsoft.NET.Sdk">
-  
+  <PropertyGroup>
+    <!-- steam default: C:\Program Files (x86)\Steam\steamapps\common\Ultimate Chicken Horse\ -->
+    <UCHfolder>C:\Program Files (x86)\Steam\steamapps\common\Ultimate Chicken Horse\</UCHfolder>
+  </PropertyGroup>
   <PropertyGroup>
     <TargetFramework>net48</TargetFramework>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <RootNamespace>MorePlayers</RootNamespace>
     <AssemblyName>MorePlayersMod</AssemblyName>
-    <OutputPath>..\..\plugins\</OutputPath>
+    <OutputPath>plugins\</OutputPath>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
     <DebugType>None</DebugType>
     <ReleaseVersion>0.4.8</ReleaseVersion>
+	  <AssemblyVersion>0.0.0.7</AssemblyVersion>
   </PropertyGroup>
   
   <ItemGroup>
     <PackageReference Include="Krafs.Publicizer" Version="1.0.1" />
-
+    <Reference Include="Assembly-CSharp">
+      <HintPath>$(UCHfolder)\UltimateChickenHorse_Data\Managed\Assembly-CSharp.dll</HintPath>
+    </Reference>
     <Reference Include="BepInEx">
-      <HintPath>..\..\core\BepInEx.dll</HintPath>
+      <HintPath>$(UCHfolder)\BepInEx\core\BepInEx.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="0Harmony">
-      <HintPath>..\..\core\0Harmony.dll</HintPath>
+      <HintPath>$(UCHfolder)\BepInEx\core\0Harmony.dll</HintPath>
       <Private>False</Private>
     </Reference>
-    <Reference Include="Assembly-CSharp">
-      <HintPath>..\..\..\UltimateChickenHorse_Data\Managed\Assembly-CSharp.dll</HintPath>
-      <Private>False</Private>
+    <Reference Include="com.unity.multiplayer-hlapi.Runtime">
+      <HintPath>$(UCHfolder)\UltimateChickenHorse_Data\Managed\com.unity.multiplayer-hlapi.Runtime.dll</HintPath>
+    </Reference>
+    <Reference Include="GameSparks.Api">
+      <HintPath>$(UCHfolder)\UltimateChickenHorse_Data\Managed\GameSparks.Api.dll</HintPath>
+    </Reference>
+    <Reference Include="InControl">
+      <HintPath>$(UCHfolder)\UltimateChickenHorse_Data\Managed\InControl.dll</HintPath>
     </Reference>
     <Reference Include="UnityEngine">
-      <HintPath>..\..\..\UltimateChickenHorse_Data\Managed\UnityEngine.dll</HintPath>
+      <HintPath>$(UCHfolder)\UltimateChickenHorse_Data\Managed\UnityEngine.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="UnityEngine.CoreModule">
-      <HintPath>..\..\..\UltimateChickenHorse_Data\Managed\UnityEngine.CoreModule.dll</HintPath>
+      <HintPath>$(UCHfolder)\UltimateChickenHorse_Data\Managed\UnityEngine.CoreModule.dll</HintPath>
       <Private>False</Private>
+    </Reference>
+    <Reference Include="UnityEngine.Physics2DModule">
+      <HintPath>..\Ultim8_mod\Ultim8_mod\libs\chicken\UnityEngine.Physics2DModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.UI">
+      <HintPath>$(UCHfolder)\UltimateChickenHorse_Data\Managed\UnityEngine.UI.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.UNETModule">
+      <HintPath>$(UCHfolder)\UltimateChickenHorse_Data\Managed\UnityEngine.UNETModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.UnityWebRequestModule">
+      <HintPath>$(UCHfolder)\UltimateChickenHorse_Data\Managed\UnityEngine.UnityWebRequestModule.dll</HintPath>
     </Reference>
   </ItemGroup>
 
   <ItemGroup>
     <Publicize Include="Assembly-CSharp" />
   </ItemGroup>
+  
+  <PropertyGroup>
+    <PostBuildEvent>
+      if not exist  "$(UCHfolder)\BepInEx\plugins\" mkdir "$(UCHfolder)\BepInEx\plugins\"
+      if not exist  "$(UCHfolder)\BepInEx\plugins\MorePlayers\" mkdir "$(UCHfolder)\BepInEx\plugins\MorePlayers\"
+      copy "MorePlayersMod.dll" "$(UCHfolder)\BepInEx\plugins\MorePlayers" /y
+  </PostBuildEvent>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <PreBuildEvent>
+      taskkill /f /fi "imagename eq UltimateChickenHorse.exe"
+    </PreBuildEvent>
+  </PropertyGroup>
+
 </Project>
