@@ -9,24 +9,24 @@ using UnityEngine;
 using UnityEngine.Networking;
 using UnityEngine.Networking.Match;
 
-[assembly: AssemblyVersion("0.0.0.6")]
-[assembly: AssemblyInformationalVersion("0.0.0.6")]
+[assembly: AssemblyVersion("0.0.0.7")]
+[assembly: AssemblyInformationalVersion("0.0.0.7")]
 
 namespace MorePlayers
 {
-    [BepInPlugin("notfood.MorePlayers", "EvenMorePlayers", "0.0.0.6")]
+    [BepInPlugin("notfood.MorePlayers", "EvenMorePlayers", "0.0.0.7")]
     public class MorePlayersMod : BaseUnityPlugin
     {
         public static bool fullDebug = false;
+        public static string og_version;
+        public static string mod_version = "0.0.0.7";
 
         void Awake()
         {
-            PlayerManager.maxPlayers = 100;
-
-            new Harmony("notfood.MorePlayers").PatchAll();
-
+            og_version = GameSettings.GetInstance().versionNumber;
+            new Harmony("notfood.MorePlayers.PlayerNumPatch").PatchAll();
+            MenuPatch.PatchMenu();
             Debug.Log("[MorePlayersMod] started.");
-            Debug.Log("[GameSettings.GetInstance().MaxPlayers] " + GameSettings.GetInstance().MaxPlayers + "; [PlayerManager.maxPlayers] " + PlayerManager.maxPlayers);
         }
     }
 
@@ -298,8 +298,8 @@ namespace MorePlayers
                 for (int i = num; i < __instance.CursorSpawnPoint.Length; i++)
                 {
                     /* map CursorSpawnPoint to 0..3
-						TODO: add new positions, so cursors aren't hidden behind each other on spawn
-					 */
+                        TODO: add new positions, so cursors aren't hidden behind each other on spawn
+                     */
                     __instance.CursorSpawnPoint[i] = __instance.CursorSpawnPoint[i % num];
                 }
             }
@@ -312,8 +312,8 @@ namespace MorePlayers
                 for (int i = num; i < __instance.UndergroundCharacterPosition.Length; i++)
                 {
                     /* map UndergroundCharacterPosition to 0..3
-						TODO: add new positions
-					 */
+                        TODO: add new positions
+                     */
                     __instance.UndergroundCharacterPosition[i] = __instance.UndergroundCharacterPosition[i % num];
                 }
             }
@@ -340,10 +340,10 @@ namespace MorePlayers
         }
     }
 
-    [HarmonyPatch(typeof(UnityEngine.Networking.NetworkLobbyManager), MethodType.Constructor)]
+    [HarmonyPatch(typeof(NetworkLobbyManager), MethodType.Constructor)]
     static class NetworkLobbyManagerCtorPatch
     {
-        static void Postfix(UnityEngine.Networking.NetworkLobbyManager __instance)
+        static void Postfix(NetworkLobbyManager __instance)
         {
             __instance.maxPlayers = PlayerManager.maxPlayers;
         }
@@ -629,6 +629,17 @@ namespace MorePlayers
         {
             Debug.Log("NetworkManager StartServer " + __instance.maxConnections + " param maxConnections " + maxConnections);
             __instance.maxConnections = PlayerManager.maxPlayers;
+        }
+    }
+
+    [HarmonyPatch(typeof(PickableNetworkButton), nameof(PickableNetworkButton.SetSearchResultInfo))]
+    static class PickableNetworkButtonCtorPatch
+    {
+        static void Postfix(PickableNetworkButton __instance, Matchmaker.LobbyListInfo lobbyInfo)
+        {
+            //Uh oh we hardcoded an 8 (let nobody see this :P)
+            __instance.NumPlayersText.text = lobbyInfo.Players.ToString() + "/8";
+
         }
     }
 }
