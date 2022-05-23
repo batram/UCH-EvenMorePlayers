@@ -83,17 +83,17 @@ namespace MorePlayers
                 more_label.transform.position -= new Vector3(0.6655f, 0f, 0f);
 
                 var more_image = more_button.transform.Find("Image");
-                more_image.transform.localScale = new Vector3(0.5073f, 0.5073f, 1f);
+                more_image.transform.localScale = new Vector3(-0.5073f, 0.5073f, 1f);
                 more_image.transform.position += new Vector3(-0.1f, 0.5073f, 0f);
                 var more_image1 = UnityEngine.Object.Instantiate<GameObject>(more_image.gameObject, more_image.transform.parent);
                 more_image1.transform.position = more_image.transform.position;
                 more_image1.transform.position -= new Vector3(0.6f, 1.2f, 0f);
-                more_image1.transform.localScale = new Vector3(0.5073f, 0.5073f, 1f);
+                more_image1.transform.localScale = new Vector3(-0.5073f, 0.5073f, 1f);
 
                 var more_image2 = UnityEngine.Object.Instantiate<GameObject>(more_image.gameObject, more_image.transform.parent);
                 more_image2.transform.position = more_image.transform.position;
                 more_image2.transform.position -= new Vector3(-0.6f, 1.2f, 0f);
-                more_image2.transform.localScale = new Vector3(0.5073f, 0.5073f, 1f);
+                more_image2.transform.localScale = new Vector3(-0.5073f, 0.5073f, 1f);
             }
 
         }
