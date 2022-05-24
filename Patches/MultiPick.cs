@@ -21,20 +21,15 @@ namespace MorePlayers
             new_character.FindPlayerOnSpawn = true;
             new_character.gameObject.transform.parent = null;
 
-            var arties = to_clone.GetComponentsInChildren<ArtMatcher>();
-            Debug.Log("ArtMatcher " + arties.Length);
-            if (arties.Length > 1)
+            //Remove all original ArtMatches, new ones are added during pick event (breaks outfit selection)
+            var arties = new_character.GetComponentsInChildren<ArtMatcher>();
+            for (var i = 0; i < arties.Length; i++)
             {
-                for (var i = 0; i < arties.Length - 1; i++)
-                {
-                    UnityEngine.Object.Destroy(arties[i].gameObject);
-                }
+                UnityEngine.Object.Destroy(arties[i].gameObject);
             }
-            foreach (BoxCollider2D c in new_character.gameObject.GetComponents<BoxCollider2D>())
-            {
-                c.enabled = true;
-            }
+
             NetworkServer.Spawn(new_character.gameObject);
+
             return new_character;
         }
     }
@@ -58,11 +53,13 @@ namespace MorePlayers
     {
         static void Prefix(Character __instance)
         {
-            Debug.Log("char awake: " + __instance.gameObject.name);
+            //Turn on all colliders, fix for collision modifier
             foreach (BoxCollider2D c in __instance.gameObject.GetComponents<BoxCollider2D>())
             {
                 c.enabled = true;
             }
+
+            //RefreshScale: fix for collision modifier
             __instance.RefreshScale();
         }
     }
@@ -88,25 +85,16 @@ namespace MorePlayers
                 {
                     __instance.characterOutfitsUnlocked.Add(artMatcher.character, new List<Outfit>[Outfit.NumOutfitTypes]);
                 }
-                else
-                {
-                    Debug.Log("OutfitManager.RebuildDatabase: dupe key " + artMatcher.character);
-                }
                 if (!__instance.characterOutfitsAll.ContainsKey(artMatcher.character))
                 {
                     __instance.characterOutfitsAll.Add(artMatcher.character, new List<Outfit>[Outfit.NumOutfitTypes]);
                 }
-                else
-                {
-                    Debug.Log("OutfitManager.RebuildDatabase: dupe key " + artMatcher.character);
-                }
+
                 for (int j = 0; j < Outfit.NumOutfitTypes; j++)
                 {
                     __instance.characterOutfitsUnlocked[artMatcher.character][j] = new List<Outfit>();
                     __instance.characterOutfitsAll[artMatcher.character][j] = new List<Outfit>();
                 }
-
-                Debug.Log("artMatcher.character" + artMatcher.character + "artMatcher.outfits " + artMatcher.outfits.Length);
 
                 foreach (Outfit outfit in artMatcher.outfits)
                 {
@@ -131,7 +119,7 @@ namespace MorePlayers
         }
     }
 
-    [HarmonyPatch(typeof(OutfitController), nameof(OutfitController.updateImages))]
+    [HarmonyPatch(typeof(OutfitController), nameof(OutfitController.Show))]
     static class OutfitControllerupdateImagesCtorPatch
     {
         static void Prefix(OutfitController __instance)
@@ -139,7 +127,6 @@ namespace MorePlayers
             __instance.OutfitManager.RebuildDatabase();
         }
     }
-
 
     [HarmonyPatch(typeof(Character), nameof(Character.GetOutfitsAsArray))]
     static class GetOutfitsAsArrayCtorPatch
@@ -182,36 +169,17 @@ namespace MorePlayers
     [HarmonyPatch(typeof(Character), nameof(Character.SetOutfitsFromArray), new Type[] { typeof(int[]) })]
     static class SetOutfitsFromArrayCtorPatch
     {
-        static bool Prefix(Character __instance, int[] outfitsArray)
+        static bool Prefix(Character __instance, ref int[] outfitsArray)
         {
-            Debug.Log("Character.SetOutfitsFromArray " + outfitsArray.Length);
             if (outfitsArray.Length == 7)
             {
-                foreach (Character car in UnityEngine.Object.FindObjectsOfType<Character>())
+                var character_go = ClientScene.FindLocalObject(new NetworkInstanceId((uint)outfitsArray[6]));
+                var character = character_go?.GetComponent<Character>();
+                Array.Resize<int>(ref outfitsArray, outfitsArray.Length - 1);
+                if (character)
                 {
-                    if (car.GetComponent<NetworkIdentity>().netId.Value == outfitsArray[6])
-                    {
-                        Outfit[] componentsInChildren = car.GetComponentsInChildren<Outfit>();
-                        for (int num = 0; num != componentsInChildren.Length; num++)
-                        {
-                            Outfit outfit = componentsInChildren[num];
-                            if (outfit.outfitType != Outfit.OutfitType.FollowOutfit && outfit.outfitType != Outfit.OutfitType.Zombie)
-                            {
-                                int outfitType = (int)outfit.outfitType;
-                                outfit.on = outfitsArray[outfitType] != -1 && num == outfitsArray[outfitType];
-                                if (outfit.on && !outfit.Unlocked)
-                                {
-                                    outfit.TempUnlocked = true;
-                                }
-                            }
-                        }
-                        car.OnOutfitsUpdated(componentsInChildren);
-                        if (__instance.hasAuthority)
-                        {
-                            car.TellEverybodyAboutOutfits();
-                        }
-                        return false;
-                    }
+                    character.SetOutfitsFromArray(outfitsArray);
+                    return false;
                 }
             }
             return true;
