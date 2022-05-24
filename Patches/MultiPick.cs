@@ -6,45 +6,42 @@ using UnityEngine.Networking;
 
 namespace MorePlayers
 {
-    [HarmonyPatch(typeof(LobbyPlayer), nameof(LobbyPlayer.CmdAssignCharacter))]
-    static class LobbyPlayerCtorPatch
+    static class MultiPick
     {
-        static void Prefix(LobbyPlayer __instance, ref uint characterNetID)
+
+        public const int multiMagicNumber = 10000;
+
+        public static Character SpawnCharacter(Character to_clone)
         {
-            GameObject gameObject = NetworkServer.FindLocalObject(new NetworkInstanceId(characterNetID));
-            if (gameObject != null)
+            Character new_character = UnityEngine.Object.Instantiate<Character>(to_clone, to_clone.transform.position, Quaternion.identity);
+            new_character.GetComponent<NetworkIdentity>().ForceSceneId(0);
+            UnityEngine.Object.Destroy(new_character.GetComponent<OGProtection>());
+
+            new_character.picked = true;
+            new_character.FindPlayerOnSpawn = true;
+            new_character.gameObject.transform.parent = null;
+
+            var arties = to_clone.GetComponentsInChildren<ArtMatcher>();
+            Debug.Log("ArtMatcher " + arties.Length);
+            if (arties.Length > 1)
             {
-                Character[] components = gameObject.GetComponents<Character>();
-
-                if (components.Length == 1)
+                for (var i = 0; i < arties.Length - 1; i++)
                 {
-                    Character component = components[0];
-                    var parent = component.transform.parent;
-
-                    Character car = UnityEngine.Object.Instantiate<Character>(component, component.transform.position, Quaternion.identity);
-                    car.GetComponent<NetworkIdentity>().ForceSceneId(0);
-                    Debug.Log("car picked: " + car.picked);
-                    car.picked = false;
-                    car.transform.parent = parent;
-                    component.transform.parent = null;
-
-                    var arties = component.GetComponentsInChildren<ArtMatcher>();
-                    Debug.Log("ArtMatcher " + arties.Length);
-                    if (arties.Length > 1)
-                    {
-                        for (var i = 0; i < arties.Length - 1; i++)
-                        {
-                            UnityEngine.Object.Destroy(arties[i].gameObject);
-                        }
-                    }
-                    foreach (BoxCollider2D c in car.gameObject.GetComponents<BoxCollider2D>())
-                    {
-                        c.enabled = true;
-                    }
-                    NetworkServer.Spawn(car.gameObject);
+                    UnityEngine.Object.Destroy(arties[i].gameObject);
                 }
             }
+            foreach (BoxCollider2D c in new_character.gameObject.GetComponents<BoxCollider2D>())
+            {
+                c.enabled = true;
+            }
+            NetworkServer.Spawn(new_character.gameObject);
+            return new_character;
         }
+    }
+
+    public class OGProtection : MonoBehaviour
+    {
+
     }
 
     [HarmonyPatch(typeof(LevelSelectController), nameof(LevelSelectController.RpcResetCharacter))]
@@ -52,9 +49,7 @@ namespace MorePlayers
     {
         static void Postfix(GameObject characterObj)
         {
-            //Bug on return to lobby
-            //NetworkServer.Destroy(characterObj);
-            //UnityEngine.Object.Destroy(characterObj);
+            NetworkServer.Destroy(characterObj);
         }
     }
 
@@ -184,9 +179,6 @@ namespace MorePlayers
         }
     }
 
-
-
-
     [HarmonyPatch(typeof(Character), nameof(Character.SetOutfitsFromArray), new Type[] { typeof(int[]) })]
     static class SetOutfitsFromArrayCtorPatch
     {
@@ -262,18 +254,149 @@ namespace MorePlayers
         }
     }
 
-    [HarmonyPatch(typeof(LobbyPlayer), nameof(LobbyPlayer.DoCharacterPickedEvent))]
-    static class LobbyPlayerDoCharacterPickedEventCtorPatch
+    [HarmonyPatch(typeof(LevelSelectController), nameof(LevelSelectController.setupController))]
+    static class LevelSelectControllerSetupControllerCtorPatch
     {
-        static bool Prefix(LobbyPlayer __instance, bool clearOutfit)
+        static bool Prefix(LevelSelectController __instance, LobbyPlayer lobbyPl)
         {
-            //unpick character in LevelSelectController.setupController
-            if (!clearOutfit)
+            Player localPlayer = lobbyPl.LocalPlayer;
+            Character.Animals[] associatedCharacters = localPlayer.UseController.GetAssociatedCharacters();
+            if (!localPlayer.UseController.ControlsPlayer(localPlayer.Number))
             {
-                __instance.UnpickCharacter();
-                return false;
+                localPlayer.UseController.AddPlayer(localPlayer.Number);
+            }
+            for (int i = associatedCharacters.Length - 1; i >= 0; i--)
+            {
+                if (associatedCharacters[i] != Character.Animals.NONE && lobbyPl.PickedAnimal == associatedCharacters[i])
+                {
+                    Debug.Log("Setting up " + associatedCharacters[i].ToString());
+                    __instance.MainCamera.SetFrameSizes(__instance.CameraHeight);
+                    lobbyPl.PlayerStatus = LobbyPlayer.Status.CHARACTER;
+
+                    Character[] chars = GameObject.FindObjectsOfType<Character>();
+                    foreach (Character character in chars)
+                    {
+                        if (associatedCharacters[i] == character.CharacterSprite)
+                        {
+                            if (!character.picked)
+                            {
+                                Debug.Log("Requesting AssociatedCharacter " + associatedCharacters[i].ToString());
+
+                                LobbyCursor lobbyCursor = (LobbyCursor)localPlayer.AssociatedLobbyPlayer.CursorInstance;
+                                if (lobbyCursor != null)
+                                {
+                                    localPlayer.AssociatedLobbyPlayer.requestedCharacterInstance = null;
+                                    lobbyCursor.UseCamera = __instance.MainCamera.GetComponent<Camera>();
+                                    localPlayer.UseController.AddReceiver(lobbyCursor);
+                                }
+
+                                localPlayer.AssociatedLobbyPlayer.RequestPickCharacter(character);
+                            }
+                        }
+                    }
+                }
+            }
+            return false;
+        }
+    }
+
+    [HarmonyPatch(typeof(LobbyPlayer), nameof(LobbyPlayer.CmdRequestPickCharacter))]
+    static class LobbyPlayerCmdRequestPickCharacterCtorPatch
+    {
+        static bool Prefix(LobbyPlayer __instance, NetworkInstanceId characterInstanceId, Character.Animals animal)
+        {
+            var character_go = NetworkServer.FindLocalObject(characterInstanceId);
+            if (character_go && character_go.GetComponent<Character>())
+            {
+                Character requested_character = character_go.GetComponent<Character>();
+
+                if (requested_character.picked || requested_character.gameObject.GetComponent<OGProtection>() != null)
+                {
+                    Character[] chars = GameObject.FindObjectsOfType<Character>();
+
+                    Character unpicked_char = null;
+
+                    foreach (Character character in chars)
+                    {
+                        if (character.GetComponent<OGProtection>() == null && character.CharacterSprite == animal && !character.picked)
+                        {
+                            unpicked_char = character;
+                            character.Networkpicked = true;
+                            break;
+                        }
+                    }
+
+                    if (unpicked_char == null)
+                    {
+                        unpicked_char = MultiPick.SpawnCharacter(requested_character);
+                    }
+
+                    uint new_id = unpicked_char.gameObject.GetComponent<NetworkIdentity>().netId.Value;
+                    __instance.CallCmdAssignCharacter(new_id, __instance.networkNumber, __instance.localNumber, false);
+                    __instance.CallRpcRequestPickResponse((int)(new_id * MultiPick.multiMagicNumber) + __instance.networkNumber, false);
+                }
+                else
+                {
+                    __instance.CallCmdAssignCharacter(characterInstanceId.Value, __instance.networkNumber, __instance.localNumber, false);
+                    __instance.CallRpcRequestPickResponse(__instance.networkNumber, true);
+                }
+            }
+            else
+            {
+                __instance.CallRpcRequestPickResponse(__instance.networkNumber, false);
+            }
+
+            return false;
+        }
+    }
+
+    [HarmonyPatch(typeof(LobbyPlayer), nameof(LobbyPlayer.RpcRequestPickResponse))]
+    static class LobbyPlayerRpcRequestPickResponseCtorPatch
+    {
+        static bool Prefix(LobbyPlayer __instance, ref int playerNetworkNumber, ref bool response)
+        {
+            Debug.Log("LobbyPlayer.RpcRequestPickResponse Prefix  " + playerNetworkNumber + " response " + response);
+
+            if (!response && playerNetworkNumber > MultiPick.multiMagicNumber)
+            {
+                var new_id = playerNetworkNumber / MultiPick.multiMagicNumber;
+                playerNetworkNumber %= MultiPick.multiMagicNumber;
+
+                var character_go = ClientScene.FindLocalObject(new NetworkInstanceId((uint)new_id));  
+                if (character_go)
+                {
+                    var car = character_go.GetComponent<Character>();
+                    Debug.Log("Got reassign Character comp " + car);
+                    if (car)
+                    {
+                        __instance.requestedCharacterInstance = car;
+                        car.SetOutfitsFromArray(__instance.characterOutfitsList);
+                        response = true;
+                    }
+                }
+
             }
             return true;
         }
+
+        static void Postfix(LobbyPlayer __instance, ref int playerNetworkNumber, ref bool response)
+        {
+            Debug.Log("LobbyPlayer.RpcRequestPickResponse Postfix " + playerNetworkNumber + " response " + response);
+        }
     }
+
+    [HarmonyPatch(typeof(LevelSelectController), nameof(LevelSelectController.Start))]
+    static class LevelSelectControllerStartCtorPatch
+    {
+        static void Prefix(LevelSelectController __instance)
+        {
+            Character[] chars = GameObject.FindObjectsOfType<Character>();
+            Debug.Log("Found " + chars.Length + " chars");
+            foreach (Character ca in chars)
+            {
+                ca.gameObject.AddComponent<OGProtection>();
+            }
+        }
+    }
+
 }
