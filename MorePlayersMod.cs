@@ -17,6 +17,9 @@ namespace MorePlayers
     [BepInPlugin("notfood.MorePlayers", "EvenMorePlayers", "0.0.0.7")]
     public class MorePlayersMod : BaseUnityPlugin
     {
+        public const int newPlayerLimit = 100;
+        public const int unityMatchLimit = 8;
+
         public static bool fullDebug = false;
         public static string og_version;
         public static string mod_version = "0.0.0.7";
@@ -24,6 +27,7 @@ namespace MorePlayers
         void Awake()
         {
             og_version = GameSettings.GetInstance().versionNumber;
+            PlayerManager.maxPlayers = newPlayerLimit;
             new Harmony("notfood.MorePlayers.PlayerNumPatch").PatchAll();
             MenuPatch.PatchMenu();
             Debug.Log("[MorePlayersMod] started.");
@@ -250,7 +254,7 @@ namespace MorePlayers
 
             __instance.playerScoreLines = new ScoreLine[numberPlayers];
 
-            Debug.LogError("GraphScoreBoard.SetPlayerCount");
+            Debug.Log("GraphScoreBoard.SetPlayerCount");
             Vector3 vector = __instance.ScorePositions[0].position + new Vector3(0f, 1.25f, 0f);
             for (int num = 0; num != numberPlayers; num++)
             {
@@ -637,9 +641,7 @@ namespace MorePlayers
     {
         static void Postfix(PickableNetworkButton __instance, Matchmaker.LobbyListInfo lobbyInfo)
         {
-            //Uh oh we hardcoded an 8 (let nobody see this :P)
-            __instance.NumPlayersText.text = lobbyInfo.Players.ToString() + "/8";
-
+            __instance.NumPlayersText.text = lobbyInfo.Players.ToString() + "/" + MorePlayersMod.unityMatchLimit;
         }
     }
 }
