@@ -32,8 +32,11 @@ namespace MorePlayers
                 if (!GameSettings.GetInstance().versionNumber.Contains(mod_version))
                 {
                     GameSettings.GetInstance().versionNumber += mod_version;
-                    PlayerManager.maxPlayers = 100;
-                    new Harmony("notfood.MorePlayers.PlayerNumPatch").PatchAll();
+                    if(PlayerManager.maxPlayers != MorePlayersMod.newPlayerLimit)
+                    {
+                        PlayerManager.maxPlayers = MorePlayersMod.newPlayerLimit;
+                        new Harmony("notfood.MorePlayers.PlayerNumPatch").PatchAll();
+                    }
                 }
 
             } else if (__instance.gameObject.name == "Play Online")
