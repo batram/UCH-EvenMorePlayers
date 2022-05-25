@@ -1,4 +1,5 @@
 using HarmonyLib;
+using System.Reflection;
 using UnityEngine;
 
 namespace MorePlayers
@@ -11,6 +12,10 @@ namespace MorePlayers
             var original = typeof(TabletMainMenuHome).GetMethod(nameof(TabletMainMenuHome.Initialize));
             var postfix = typeof(TabletMainMenuHomeCtorPatch).GetMethod(nameof(TabletMainMenuHomeCtorPatch.Postfix));
             harmony.Patch(original, postfix: new HarmonyMethod(postfix));
+
+            var update_original = typeof(TabletMainMenuHome).GetMethod("Update", BindingFlags.NonPublic | BindingFlags.Instance);
+            var update_postfix = typeof(TabletMainMenuHomeScoochButtonsCtorPatch).GetMethod("Postfix");
+            harmony.Patch(update_original, postfix: new HarmonyMethod(update_postfix));
 
             var accept_original = typeof(TabletButton).GetMethod(nameof(TabletButton.OnAccept));
             var accept_prefix = typeof(TabletButtonOnAcceptCtorPatch).GetMethod(nameof(TabletButtonOnAcceptCtorPatch.Prefix));
@@ -98,6 +103,30 @@ namespace MorePlayers
                 more_image2.transform.position = more_image.transform.position;
                 more_image2.transform.position -= new Vector3(-0.6f, 1.2f, 0f);
                 more_image2.transform.localScale = new Vector3(-0.5073f, 0.5073f, 1f);
+            }
+        }
+    }
+    
+    static class TabletMainMenuHomeScoochButtonsCtorPatch
+    {
+        static public void Postfix()
+        {
+            GameObject more_button = GameObject.Find("main Buttons/Play More");
+            if (more_button && more_button.transform.localScale.x != 1.015f)
+            {
+                Debug.Log("damn buttons will not move!!");
+                //Adjust local button
+                GameObject play_local = GameObject.Find("main Buttons/Play");
+                play_local.transform.localPosition = new Vector2(-320f, play_local.transform.localPosition.y);
+                play_local.transform.localScale = new Vector3(1.015f, 1, 1);
+
+                //Adjust online button
+                GameObject play_online = GameObject.Find("main Buttons/Play Online");
+                play_online.transform.localScale = new Vector3(1.015f, 1, 1);
+
+                //Adjust more button
+                more_button.transform.localScale = new Vector3(1.015f, 1, 1);
+                more_button.transform.localPosition = new Vector2(320f, more_button.transform.localPosition.y);
             }
         }
     }
