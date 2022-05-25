@@ -60,6 +60,9 @@
     <Reference Include="UnityEngine.UnityWebRequestModule">
       <HintPath>$(UCHfolder)\UltimateChickenHorse_Data\Managed\UnityEngine.UnityWebRequestModule.dll</HintPath>
     </Reference>
+    <Reference Include="UnityEngine.IMGUIModule">
+      <HintPath>$(UCHfolder)\UltimateChickenHorse_Data\Managed\UnityEngine.IMGUIModule.dll</HintPath>
+    </Reference>
   </ItemGroup>
 
   <ItemGroup>

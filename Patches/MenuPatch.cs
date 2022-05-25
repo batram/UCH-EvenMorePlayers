@@ -1,6 +1,5 @@
 using HarmonyLib;
 using UnityEngine;
-using UnityEngine.Networking;
 
 namespace MorePlayers
 {
@@ -32,25 +31,25 @@ namespace MorePlayers
                 if (!GameSettings.GetInstance().versionNumber.Contains(mod_version))
                 {
                     GameSettings.GetInstance().versionNumber += mod_version;
-                    if(PlayerManager.maxPlayers != MorePlayersMod.newPlayerLimit)
+                    if (PlayerManager.maxPlayers != MorePlayersMod.newPlayerLimit)
                     {
                         PlayerManager.maxPlayers = MorePlayersMod.newPlayerLimit;
                         new Harmony("notfood.MorePlayers.PlayerNumPatch").PatchAll();
                     }
                 }
-
-            } else if (__instance.gameObject.name == "Play Online")
+            }
+            else if (__instance.gameObject.name == "Play Online")
             {
                 GameSettings.GetInstance().versionNumber = MorePlayersMod.og_version;
                 PlayerManager.maxPlayers = 4;
                 Harmony.UnpatchAll();
                 MenuPatch.PatchMenu();
+                MoreCode.CleanGUI();
             }
 
         }
     }
 
-            
     static class TabletMainMenuHomeCtorPatch
     {
         static public void Postfix(ChallengeScoreboard __instance)
@@ -100,7 +99,6 @@ namespace MorePlayers
                 more_image2.transform.position -= new Vector3(-0.6f, 1.2f, 0f);
                 more_image2.transform.localScale = new Vector3(-0.5073f, 0.5073f, 1f);
             }
-
         }
     }
 }
