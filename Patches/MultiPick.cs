@@ -286,26 +286,9 @@ namespace MorePlayers
 
                 if (requested_character.picked || requested_character.gameObject.GetComponent<OGProtection>() != null)
                 {
-                    Character[] chars = GameObject.FindObjectsOfType<Character>();
+                    Character nspawn_char = MultiPick.SpawnCharacter(requested_character);
+                    uint new_id = nspawn_char.gameObject.GetComponent<NetworkIdentity>().netId.Value;
 
-                    Character unpicked_char = null;
-
-                    foreach (Character character in chars)
-                    {
-                        if (character.GetComponent<OGProtection>() == null && character.CharacterSprite == animal && !character.picked)
-                        {
-                            unpicked_char = character;
-                            character.Networkpicked = true;
-                            break;
-                        }
-                    }
-
-                    if (unpicked_char == null)
-                    {
-                        unpicked_char = MultiPick.SpawnCharacter(requested_character);
-                    }
-
-                    uint new_id = unpicked_char.gameObject.GetComponent<NetworkIdentity>().netId.Value;
                     __instance.CallCmdAssignCharacter(new_id, __instance.networkNumber, __instance.localNumber, false);
                     __instance.CallRpcRequestPickResponse((int)(new_id * MultiPick.multiMagicNumber) + __instance.networkNumber, false);
                 }
