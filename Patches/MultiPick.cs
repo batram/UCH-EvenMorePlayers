@@ -113,6 +113,11 @@ namespace MorePlayers
                         }
                     }
                 }
+                
+                if(artMatcher.character && artMatcher.character.associatedLobbyPlayer)
+                {
+                    artMatcher.character.SetOutfitsFromArray(artMatcher.character.associatedLobbyPlayer.characterOutfitsList);
+                }
             }
 
             return false;
@@ -128,16 +133,21 @@ namespace MorePlayers
         }
     }
 
+    
     [HarmonyPatch(typeof(Character), nameof(Character.GetOutfitsAsArray))]
     static class GetOutfitsAsArrayCtorPatch
     {
         static void Postfix(Character __instance, ref int[] __result)
         {
-            Debug.Log("Character.GetOutfitsAsArray " + __instance + " netid: " + __instance.GetComponent<NetworkIdentity>().netId);
-            Array.Resize<int>(ref __result, __result.Length + 1);
-            __result[__result.Length - 1] = (int)__instance.GetComponent<NetworkIdentity>().netId.Value;
+            var netid = (int)__instance.GetComponent<NetworkIdentity>()?.netId.Value;
+            if(netid != null && netid != 0)
+            {
+                Array.Resize<int>(ref __result, __result.Length + 1);
+                __result[__result.Length - 1] = netid;
+            }
         }
     }
+
 
     [HarmonyPatch(typeof(Character), nameof(Character.SetOutfitsFromArray), new Type[] { typeof(SyncListInt) })]
     static class SetOutfitsFromArraySyncListIntCtorPatch
@@ -145,24 +155,20 @@ namespace MorePlayers
         static bool Prefix(Character __instance, SyncListInt outfitsSyncList)
         {
             Debug.Log("Character.SetOutfitsFromArray " + outfitsSyncList.Count);
-            if (outfitsSyncList.Count == 7)
+            int[] array = new int[outfitsSyncList.Count == 7 ? 7 : 6];
+            for (int i = 0; i < array.Length; i++)
             {
-                int[] array = new int[Outfit.NumOutfitTypes + 1];
-                for (int i = 0; i < Outfit.NumOutfitTypes; i++)
+                if (outfitsSyncList.Count > i)
                 {
-                    if (outfitsSyncList.Count > i)
-                    {
-                        array[i] = outfitsSyncList[i];
-                    }
-                    else
-                    {
-                        array[i] = -1;
-                    }
+                    array[i] = outfitsSyncList[i];
                 }
-                __instance.SetOutfitsFromArray(array);
-                return false;
+                else
+                {
+                    array[i] = -1;
+                }
             }
-            return true;
+            __instance.SetOutfitsFromArray(array);
+            return false;
         }
     }
 
@@ -186,7 +192,7 @@ namespace MorePlayers
         }
     }
 
-    [HarmonyPatch(typeof(LevelSelectController), nameof(LevelSelectController.IsCharacterTaken))]
+   [HarmonyPatch(typeof(LevelSelectController), nameof(LevelSelectController.IsCharacterTaken))]
     static class LevelSelectControllerIsCharacterTakenCtorPatch
     {
         static void Postfix(ref bool __result, LevelSelectController __instance)
@@ -338,7 +344,6 @@ namespace MorePlayers
                     if (car)
                     {
                         __instance.requestedCharacterInstance = car;
-                        car.SetOutfitsFromArray(__instance.characterOutfitsList);
                         response = true;
                     }
                 }
@@ -367,4 +372,13 @@ namespace MorePlayers
         }
     }
 
+    [HarmonyPatch(typeof(LobbyPlayer), nameof(LobbyPlayer.DoCharacterPickedEvent))]
+    static class LobbyPlayerDoCharacterPickedEventCtorPatch
+    {
+        static void Prefix(ref bool clearOutfit)
+        {
+            Debug.Log("DoCharacterPickedEvent " + clearOutfit);
+            clearOutfit = false;
+        }
+    }
 }
