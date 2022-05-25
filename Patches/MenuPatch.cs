@@ -47,11 +47,9 @@ namespace MorePlayers
             {
                 GameSettings.GetInstance().versionNumber = MorePlayersMod.og_version;
                 PlayerManager.maxPlayers = 4;
-                Harmony.UnpatchAll();
-                MenuPatch.PatchMenu();
+                Harmony.UnpatchID("notfood.MorePlayers.PlayerNumPatch");
                 MoreCode.CleanGUI();
             }
-
         }
     }
 
