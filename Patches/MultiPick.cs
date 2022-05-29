@@ -364,4 +364,20 @@ namespace MorePlayers
             clearOutfit = false;
         }
     }
+
+    [HarmonyPatch(typeof(LevelSelectController), nameof(LevelSelectController.setupLobby))]
+    static class LevelSelectControllerSetupLobbyCtorPatch
+    {
+        static void Postfix(LevelSelectController __instance)
+        {
+            if (!GameState.GetInstance().currentSnapshotInfo.snapshotName.NullOrEmpty() || GameState.GetInstance().lastLevelPlayed == GameState.GetLevelSceneName(GameState.LevelName.BLANKLEVEL))
+            {
+                foreach (LobbyStartPoint lobbyStartPoint in __instance.StartingPoints)
+                {
+                    Character componentInChildren = lobbyStartPoint.GetComponentInChildren<Character>();
+                    componentInChildren.PositionCharacter(lobbyStartPoint.transform.position, true);
+                }
+            }
+        }
+    }
 }
