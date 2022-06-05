@@ -109,6 +109,7 @@ namespace MorePlayers
             }
         }
     }
+
     [HarmonyPatch]
     static class SwitchSecond4ForMaxNumPatch
     {
