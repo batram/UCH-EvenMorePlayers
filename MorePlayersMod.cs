@@ -138,7 +138,6 @@ namespace MorePlayers
         }
     }
 
-
     [HarmonyPatch]
     static class Switch5ForNumPlusOnePatch
     {
@@ -227,15 +226,18 @@ namespace MorePlayers
     [HarmonyPatch(typeof(Controller), nameof(Controller.RemovePlayer))]
     static class ControllerRemovePlayerPatch
     {
-        static void Postfix(Controller __instance, int player)
+        static bool Prefix(Controller __instance, int player)
         {
-            //not sure what is calculated here ...
-            var num = (15 ^ (1 << player - 1));
-            Debug.Log("ControllerRemovePlayer player" + player);
-            Debug.Log("ControllerRemovePlayer num " + num);
-            Debug.Log("ControllerRemovePlayer this.Player " + (__instance.Player));
-            Debug.Log("ControllerRemovePlayer this.Player &= num " + (__instance.Player &= num));
+            // remove player bit from bitmask
+            var num = ~(1 << (player - 1));
+            __instance.Player &= num;
+            __instance.associatedChars[player - 1] = Character.Animals.NONE;
+            if (__instance.Player == 0)
+            {
+                __instance.PossibleNetWorkNumber = 0;
+            }
             __instance.Player = 0;
+            return false;
         }
     }
 
@@ -271,10 +273,6 @@ namespace MorePlayers
 
             // skip function
             return false;
-        }
-
-        static void Postfix(GraphScoreBoard __instance, int numberPlayers)
-        {
         }
     }
 
@@ -595,4 +593,64 @@ namespace MorePlayers
             __instance.NumPlayersText.text = lobbyInfo.Players.ToString() + "/" + MorePlayersMod.unityMatchLimit;
         }
     }
+
+    [HarmonyPatch(typeof(GameControl), nameof(GameControl.Awake))]
+    static class GameControlCtorPatch
+    {
+        static void Postfix(GameControl __instance)
+        {
+            if (__instance.showScoreButtons.Length < PlayerManager.maxPlayers)
+            {
+                Array.Resize(ref __instance.showScoreButtons, PlayerManager.maxPlayers);
+            }
+        }
+    }
+
+    [HarmonyPatch(typeof(GameControl), nameof(GameControl.ReceiveEvent))]
+    static class GameControlReceiveEventCtorPatch
+    {
+        static void Prefix(GameControl __instance, InputEvent e)
+        {
+
+            __instance.inputPlayerNumber = 0;
+            //TODO: Fix overflow int for more than 94 players
+            for (var i = 0; i < PlayerManager.maxPlayers && i < 95; i++)
+            {
+                if ((e.PlayerBitMask & (1 << i)) == (1 << i))
+                {
+                    __instance.inputPlayerNumber = i + 1;
+                    break;
+                }
+            }
+        }
+    }
+
+    [HarmonyPatch]
+    static class GameControlReceiveEventDropInputPlayerNumber0Patch
+    {
+        static IEnumerable<MethodBase> TargetMethods()
+        {
+            yield return AccessTools.Method(typeof(GameControl), nameof(GameControl.ReceiveEvent));
+        }
+
+        static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> e)
+        {
+            var done = false;
+
+            foreach (var inst in e)
+            {
+                if (!done && inst.opcode != OpCodes.Ldarg_1)
+                {
+                    // NOP out this.inputPlayerNumber = 0;
+                    inst.opcode = OpCodes.Nop;
+                }
+                else
+                {
+                    done = true;
+                }
+                yield return inst;
+            }
+        }
+    }
+
 }

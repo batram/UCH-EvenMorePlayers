@@ -189,3 +189,11 @@ class PickableNetworkButton
 [DD] class Matchmaker
   [DD] function CleanUpPlayers                              hardcoded 5
 
+
+class GameControl
+  [DD] protected bool[] showScoreButtons 
+    = new bool[PlayerManager.maxPlayers];                   assigned before fix
+
+  [DD] function ReceiveEvent                                PlayerBitMask to inputPlayerNumber only for 4 players
+                                                            !! BitMask int overflow for more than 94 players
+
