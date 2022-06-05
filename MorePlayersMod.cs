@@ -145,6 +145,7 @@ namespace MorePlayers
         {
             yield return AccessTools.Method(typeof(SteamMatchmaker), nameof(SteamMatchmaker.OnSteamLobbyJoinRequested));
             yield return AccessTools.Method(typeof(LobbyManager), nameof(LobbyManager.OnLobbyClientAddPlayerFailed));
+            yield return AccessTools.Method(typeof(Matchmaker), nameof(Matchmaker.CleanUpPlayers));
         }
 
         static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> e)
