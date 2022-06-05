@@ -185,3 +185,7 @@ class PickableNetworkButton
 [DD] class BeeSwarm
   [DD] function Awake                                       hardcoded 4 size
 
+
+[DD] class Matchmaker
+  [DD] function CleanUpPlayers                              hardcoded 5
+
