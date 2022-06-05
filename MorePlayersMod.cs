@@ -39,6 +39,7 @@ namespace MorePlayers
     {
         static IEnumerable<MethodBase> TargetMethods()
         {
+            yield return AccessTools.Method(typeof(BeeSwarm), nameof(BeeSwarm.Awake));
             yield return AccessTools.Method(typeof(ChallengeScoreboard), nameof(ChallengeScoreboard.CollectPlayerIds));
             yield return AccessTools.Method(typeof(Controller), nameof(Controller.AddPlayer));
             yield return AccessTools.Method(typeof(Controller), nameof(Controller.AssociateCharacter));

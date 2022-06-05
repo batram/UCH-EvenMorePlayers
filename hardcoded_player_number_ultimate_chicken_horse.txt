@@ -181,3 +181,7 @@ class PickableNetworkButton
 [DD] class NetworkManager
   [DD] private int m_MaxConnections = 4                     would only allow 5 players (host + 4 external) // patched via maxConnections
 
+
+[DD] class BeeSwarm
+  [DD] function Awake                                       hardcoded 4 size
+
