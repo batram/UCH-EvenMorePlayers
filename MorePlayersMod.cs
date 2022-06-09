@@ -236,7 +236,6 @@ namespace MorePlayers
             {
                 __instance.PossibleNetWorkNumber = 0;
             }
-            __instance.Player = 0;
             return false;
         }
     }
