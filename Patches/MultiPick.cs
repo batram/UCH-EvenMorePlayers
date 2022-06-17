@@ -113,8 +113,8 @@ namespace MorePlayers
                         }
                     }
                 }
-                
-                if(artMatcher.character && artMatcher.character.associatedLobbyPlayer)
+
+                if (artMatcher.character && artMatcher.character.associatedLobbyPlayer)
                 {
                     artMatcher.character.SetOutfitsFromArray(artMatcher.character.associatedLobbyPlayer.characterOutfitsList);
                 }
@@ -133,21 +133,19 @@ namespace MorePlayers
         }
     }
 
-    
     [HarmonyPatch(typeof(Character), nameof(Character.GetOutfitsAsArray))]
     static class GetOutfitsAsArrayCtorPatch
     {
         static void Postfix(Character __instance, ref int[] __result)
         {
             var netid = (int)__instance.GetComponent<NetworkIdentity>()?.netId.Value;
-            if(netid != null && netid != 0)
+            if (netid != null && netid != 0)
             {
                 Array.Resize<int>(ref __result, __result.Length + 1);
                 __result[__result.Length - 1] = netid;
             }
         }
     }
-
 
     [HarmonyPatch(typeof(Character), nameof(Character.SetOutfitsFromArray), new Type[] { typeof(SyncListInt) })]
     static class SetOutfitsFromArraySyncListIntCtorPatch
@@ -192,7 +190,7 @@ namespace MorePlayers
         }
     }
 
-   [HarmonyPatch(typeof(LevelSelectController), nameof(LevelSelectController.IsCharacterTaken))]
+    [HarmonyPatch(typeof(LevelSelectController), nameof(LevelSelectController.IsCharacterTaken))]
     static class LevelSelectControllerIsCharacterTakenCtorPatch
     {
         static void Postfix(ref bool __result, LevelSelectController __instance)
@@ -319,7 +317,7 @@ namespace MorePlayers
                 var new_id = playerNetworkNumber / MultiPick.multiMagicNumber;
                 playerNetworkNumber %= MultiPick.multiMagicNumber;
 
-                var character_go = ClientScene.FindLocalObject(new NetworkInstanceId((uint)new_id));  
+                var character_go = ClientScene.FindLocalObject(new NetworkInstanceId((uint)new_id));
                 if (character_go)
                 {
                     var car = character_go.GetComponent<Character>();
@@ -376,6 +374,34 @@ namespace MorePlayers
                 {
                     Character componentInChildren = lobbyStartPoint.GetComponentInChildren<Character>();
                     componentInChildren.PositionCharacter(lobbyStartPoint.transform.position, true);
+                }
+            }
+        }
+    }
+
+    [HarmonyPatch(typeof(GraphScoreBoard), nameof(GraphScoreBoard.MarkPlayerDisconnected))]
+    static class GraphScoreBoardMarkPlayerDisconnectedCtorPatch
+    {
+        static bool Prefix()
+        {
+            //Disconnect Animal Enum based, reimplement in VersusControl.handleEvent 
+            return false;
+        }
+    }
+
+    [HarmonyPatch(typeof(VersusControl), nameof(VersusControl.handleEvent))]
+    static class VersusControlHandleEventCtorPatch
+    {
+        static void Prefix(VersusControl __instance, GameEvent.GameEvent e)
+        {
+            Type type = e.GetType();
+            if (type == typeof(GameEvent.GamePlayerRemovedEvent))
+            {
+                GameEvent.GamePlayerRemovedEvent removedEvent = e as GameEvent.GamePlayerRemovedEvent;
+                var relation = __instance.graphScoreBoardInstance.scorelineRelation;
+                if (relation.ContainsKey(removedEvent.PlayerNetworkNumber))
+                {
+                    relation[removedEvent.PlayerNetworkNumber].SetDisconnected(true);
                 }
             }
         }
