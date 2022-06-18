@@ -1,6 +1,7 @@
 using HarmonyLib;
 using System.Reflection;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace MorePlayers
 {
@@ -20,6 +21,10 @@ namespace MorePlayers
             var accept_original = typeof(TabletButton).GetMethod(nameof(TabletButton.OnAccept));
             var accept_prefix = typeof(TabletButtonOnAcceptCtorPatch).GetMethod(nameof(TabletButtonOnAcceptCtorPatch.Prefix));
             harmony.Patch(accept_original, prefix: new HarmonyMethod(accept_prefix));
+
+            var onlinestate_original = typeof(TabletMainMenuOnlineIndicator).GetMethod("SetPlayOnlineButtonState", BindingFlags.NonPublic | BindingFlags.Instance);
+            var onlinestate_prefix = typeof(TabletMainMenuOnlineIndicatorCtorPatch).GetMethod("Postfix");
+            harmony.Patch(onlinestate_original, prefix: new HarmonyMethod(onlinestate_prefix));
         }
     }
 
@@ -84,7 +89,6 @@ namespace MorePlayers
                 more_button.name = "Play More";
                 more_button.transform.SetParent(play_online.transform.parent);
                 more_button.transform.localScale = new Vector3(1f, 1f, 1f);
-                more_button.transform.Find("LoadingSpinner").gameObject.SetActive(false);
                 var more_label = more_button.transform.Find("Text Label").GetComponent<TabletTextLabel>();
                 more_label.text = "More";
                 more_label.transform.position -= new Vector3(0.6655f, 0f, 0f);
@@ -93,11 +97,13 @@ namespace MorePlayers
                 more_image.transform.localScale = new Vector3(-0.5073f, 0.5073f, 1f);
                 more_image.transform.position += new Vector3(-0.06f, 0.5073f, 0f);
                 var more_image1 = Object.Instantiate<GameObject>(more_image.gameObject, more_image.transform.parent);
+                more_image1.name = "Image1";
                 more_image1.transform.position = more_image.transform.position;
                 more_image1.transform.position -= new Vector3(0.6f, 1.2f, 0f);
                 more_image1.transform.localScale = new Vector3(-0.5073f, 0.5073f, 1f);
 
                 var more_image2 = Object.Instantiate<GameObject>(more_image.gameObject, more_image.transform.parent);
+                more_image2.name = "Image2";
                 more_image2.transform.position = more_image.transform.position;
                 more_image2.transform.position -= new Vector3(-0.6f, 1.2f, 0f);
                 more_image2.transform.localScale = new Vector3(-0.5073f, 0.5073f, 1f);
@@ -125,6 +131,26 @@ namespace MorePlayers
                 //Adjust more button
                 more_button.transform.localScale = new Vector3(1.015f, 1, 1);
                 more_button.transform.localPosition = new Vector2(320f, more_button.transform.localPosition.y);
+            }
+        }
+    }
+
+    static class TabletMainMenuOnlineIndicatorCtorPatch
+    {
+        static public void Postfix(bool spinnerActive, bool buttonActive)
+        {
+            GameObject more_button = GameObject.Find("main Buttons/Play More");
+            if (more_button)
+            {
+                more_button.transform.Find("LoadingSpinner")?.gameObject.SetActive(spinnerActive);
+                TabletDisableGroup tdg = more_button.GetComponent<TabletDisableGroup>();
+                if (tdg != null && more_button.GetComponent<TabletDisableGroup>().Disabled != !buttonActive)
+                {
+                    more_button.GetComponent<TabletDisableGroup>().SetDisabled(!buttonActive);
+                    TabletButton tb = more_button.GetComponent<TabletButton>();
+                    more_button.transform.Find("Image1").GetComponent<Image>().color = tb.labelImage.color;
+                    more_button.transform.Find("Image2").GetComponent<Image>().color = tb.labelImage.color;
+                }
             }
         }
     }
