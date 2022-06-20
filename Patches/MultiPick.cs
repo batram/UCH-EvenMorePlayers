@@ -11,9 +11,9 @@ namespace MorePlayers
 
         public const int multiMagicNumber = 10000;
 
-        public static Character SpawnCharacter(Character to_clone)
+        public static Character SpawnCharacter(Character to_clone, Vector3 position)
         {
-            Character new_character = UnityEngine.Object.Instantiate<Character>(to_clone, to_clone.transform.position, Quaternion.identity);
+            Character new_character = UnityEngine.Object.Instantiate<Character>(to_clone, position, Quaternion.identity);
             new_character.GetComponent<NetworkIdentity>().ForceSceneId(0);
             UnityEngine.Object.Destroy(new_character.GetComponent<OGProtection>());
 
@@ -284,7 +284,13 @@ namespace MorePlayers
 
                 if (requested_character.picked || requested_character.gameObject.GetComponent<OGProtection>() != null)
                 {
-                    Character nspawn_char = MultiPick.SpawnCharacter(requested_character);
+                    Vector3 spawn_position = requested_character.transform.position;
+                    if (__instance.playerStatus == LobbyPlayer.Status.CHARACTER && (!GameState.GetInstance().currentSnapshotInfo.snapshotName.NullOrEmpty() || GameState.GetInstance().lastLevelPlayed == GameState.GetLevelSceneName(GameState.LevelName.BLANKLEVEL)))
+                    {
+                        spawn_position = LobbyManager.instance.CurrentLevelSelectController.UndergroundCharacterPosition[__instance.networkNumber - 1].position;
+                    }
+
+                    Character nspawn_char = MultiPick.SpawnCharacter(requested_character, spawn_position);
                     uint new_id = nspawn_char.gameObject.GetComponent<NetworkIdentity>().netId.Value;
 
                     __instance.CallCmdAssignCharacter(new_id, __instance.networkNumber, __instance.localNumber, false);
