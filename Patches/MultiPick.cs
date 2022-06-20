@@ -42,6 +42,15 @@ namespace MorePlayers
     [HarmonyPatch(typeof(LevelSelectController), nameof(LevelSelectController.RpcResetCharacter))]
     static class LevelSelectControllerRpcResetCharacterCtorPatch
     {
+        static void Prefix(LevelSelectController __instance, GameObject characterObj)
+        {
+            Character c = characterObj.GetComponent<Character>();
+            if (c)
+            {
+                __instance.MainCamera.RemoveTarget(c);
+            }
+        }
+
         static void Postfix(GameObject characterObj)
         {
             NetworkServer.Destroy(characterObj);
@@ -355,6 +364,29 @@ namespace MorePlayers
             foreach (Character ca in chars)
             {
                 ca.gameObject.AddComponent<OGProtection>();
+            }
+        }
+    }
+
+    [HarmonyPatch(typeof(LevelSelectController), nameof(LevelSelectController.SetupLobbyAfterWait))]
+    static class LevelSelectControllerSetupLobbyAfterWaitCtorPatch
+    {
+        static void Prefix(LevelSelectController __instance)
+        {
+            Character[] chars = GameObject.FindObjectsOfType<Character>();
+            var num = 0;
+            foreach (Character ca in chars)
+            {
+                if (ca.Picked && !ca.Sitting)
+                {
+                    __instance.MainCamera.AddTarget(ca);
+                    num++;
+                    ca.SetLobbyCollider(true);
+                }
+            }
+            if (num > 0)
+            {
+                __instance.MainCamera.SetFrameSizes(__instance.CameraHeight);
             }
         }
     }
