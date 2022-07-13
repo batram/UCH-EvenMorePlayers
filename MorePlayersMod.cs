@@ -15,7 +15,7 @@ using UnityEngine.Networking.Match;
 
 namespace MorePlayers
 {
-    [BepInPlugin("notfood.MorePlayers", "EvenMorePlayers", "0.0.0.7.1")]
+    [BepInPlugin("notfood.MorePlayers", "EvenMorePlayers", "0.0.0.7")]
     public class MorePlayersMod : BaseUnityPlugin
     {
         public const int newPlayerLimit = 100;
