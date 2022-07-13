@@ -9,12 +9,13 @@ using UnityEngine;
 using UnityEngine.Networking;
 using UnityEngine.Networking.Match;
 
+//TODO: drop a few zeros on next major release
 [assembly: AssemblyVersion("0.0.0.7")]
-[assembly: AssemblyInformationalVersion("0.0.0.7")]
+[assembly: AssemblyInformationalVersion("0.0.0.7.1")]
 
 namespace MorePlayers
 {
-    [BepInPlugin("notfood.MorePlayers", "EvenMorePlayers", "0.0.0.7")]
+    [BepInPlugin("notfood.MorePlayers", "EvenMorePlayers", "0.0.0.7.1")]
     public class MorePlayersMod : BaseUnityPlugin
     {
         public const int newPlayerLimit = 100;
