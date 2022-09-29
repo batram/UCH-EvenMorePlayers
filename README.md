@@ -1,5 +1,6 @@
 # Even More Players
 This is an `Ultimate Chicken Horse` `BepInEx` mod that allows for more than 4 players to play local and online. WIP.
+Works for UCH version 1.8.22, suport for the new patch 1.9.02 might take a while.
 
 [Watch the video](https://user-images.githubusercontent.com/1382274/167601047-5b48eaa5-2b1d-42b3-8db4-5b271f7f2475.mp4)
 
