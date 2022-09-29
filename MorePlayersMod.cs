@@ -18,7 +18,6 @@ namespace MorePlayers
     public class MorePlayersMod : BaseUnityPlugin
     {
         public const int newPlayerLimit = 100;
-        public const int unityMatchLimit = 8;
 
         public static bool fullDebug = false;
         public static string og_version;
@@ -589,7 +588,7 @@ namespace MorePlayers
     {
         static void Postfix(PickableNetworkButton __instance, Matchmaker.LobbyListInfo lobbyInfo)
         {
-            __instance.NumPlayersText.text = lobbyInfo.Players.ToString() + "/" + MorePlayersMod.unityMatchLimit;
+            __instance.NumPlayersText.text = lobbyInfo.Players.ToString() + "/?";
         }
     }
 
