@@ -65,7 +65,7 @@ namespace MorePlayers
             yield return AccessTools.Method(typeof(SwitchController), nameof(SwitchController.Reset));
             yield return AccessTools.Method(typeof(TurnIndicator), nameof(TurnIndicator.SetPlayerCount));
             yield return AccessTools.Method(typeof(UnityMatchmaker), nameof(UnityMatchmaker.CheckHostConnectivity));
-            yield return AccessTools.Method(typeof(UnityMatchmaker), nameof(UnityMatchmaker.CreateUnityMatch));
+            //yield return AccessTools.Method(typeof(UnityMatchmaker), nameof(UnityMatchmaker.CreateUnityMatch));
             yield return AccessTools.Method(typeof(VersusControl), "get_playersLeftToPlace");
         }
 
