@@ -574,7 +574,7 @@ namespace MorePlayers
         }
     }
 
-    [HarmonyPatch(typeof(NetworkManager), nameof(NetworkManager.StartServer), new Type[] { typeof(MatchInfo), typeof(ConnectionConfig), typeof(int) })]
+    [HarmonyPatch(typeof(NetworkManager), nameof(NetworkManager.StartServer), new Type[] {typeof(ConnectionConfig), typeof(int) })]
     static class NetworkManagerCtorPatch
     {
         static void Prefix(NetworkManager __instance, int maxConnections)
