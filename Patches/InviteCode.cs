@@ -133,7 +133,7 @@ namespace MorePlayers
             return true;
         }
     }
-
+    
     [HarmonyPatch(typeof(TabletLobbyOptionsScreen), nameof(TabletLobbyOptionsScreen.OnClickShowToggle))]
     static class TabletLobbyOptionsScreenCtorPatch
     {
@@ -142,11 +142,11 @@ namespace MorePlayers
             __instance.lobbyCodeShown = !__instance.lobbyCodeShown;
             if (__instance.lobbyCodeShown)
             {
-                AkSoundEngine.PostEvent("UI_UPad_Online_Lobby_Code_Show", __instance.gameObject);
+                //AkSoundEngine.PostEvent("UI_UPad_Online_Lobby_Code_Show", __instance.gameObject);
                 __instance.lobbyCodeText.text = MoreCode.Fudge(Matchmaker.CurrentMatchmakingLobby.GetLobbyCode());
                 return false;
             }
-            AkSoundEngine.PostEvent("UI_UPad_Online_Lobby_Code_Hide", __instance.gameObject);
+            //kSoundEngine.PostEvent("UI_UPad_Online_Lobby_Code_Hide", __instance.gameObject);
             __instance.lobbyCodeText.text = MoreCode.Stars;
             return false;
         }

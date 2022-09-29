@@ -229,7 +229,7 @@ namespace MorePlayers
                 }
                 Time.timeScale = __instance.GameSpeed;
             }
-            AkSoundEngine.PostEvent(__instance.RateOfFireAudioEventStrings[__instance.RateOfFireMode], LobbyManager.instance.gameObject);
+            //AkSoundEngine.PostEvent(__instance.RateOfFireAudioEventStrings[__instance.RateOfFireMode], LobbyManager.instance.gameObject);
 
             return false;
         }
