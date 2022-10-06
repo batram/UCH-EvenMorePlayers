@@ -9,19 +9,19 @@ using UnityEngine;
 using UnityEngine.Networking;
 using UnityEngine.Networking.Match;
 
-[assembly: AssemblyVersion("0.9.0.0")]
-[assembly: AssemblyInformationalVersion("0.9.0.0")]
+[assembly: AssemblyVersion("0.9.0.1")]
+[assembly: AssemblyInformationalVersion("0.9.0.1")]
 
 namespace MorePlayers
 {
-    [BepInPlugin("notfood.MorePlayers", "EvenMorePlayers", "0.9.0.0")]
+    [BepInPlugin("notfood.MorePlayers", "EvenMorePlayers", "0.9.0.1")]
     public class MorePlayersMod : BaseUnityPlugin
     {
         public const int newPlayerLimit = 100;
 
         public static bool fullDebug = true;
         public static string og_version;
-        public static string mod_version = "0.9.0.0";
+        public static string mod_version = "0.9.0.1";
 
         void Awake()
         {
@@ -65,7 +65,7 @@ namespace MorePlayers
             yield return AccessTools.Method(typeof(TurnIndicator), nameof(TurnIndicator.SetPlayerCount));
             yield return AccessTools.Method(typeof(UnityMatchmaker), nameof(UnityMatchmaker.CheckHostConnectivity));
             //yield return AccessTools.Method(typeof(UnityMatchmaker), nameof(UnityMatchmaker.CreateUnityMatch));
-            yield return AccessTools.Method(typeof(VersusControl), "get_playersLeftToPlace");
+            yield return AccessTools.Method(typeof(VersusControl), "get_playersLeftToPlace");            
         }
 
         static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> e)
@@ -115,6 +115,7 @@ namespace MorePlayers
         static IEnumerable<MethodBase> TargetMethods()
         {
             yield return AccessTools.Method(typeof(LobbySkillTracker), nameof(LobbySkillTracker.UpdateLobbyInfo));
+            yield return AccessTools.Method(typeof(UnityMatchmaker), nameof(UnityMatchmaker.onLobbyJoined));
         }
 
         static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> e)
