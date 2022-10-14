@@ -20,7 +20,7 @@ Multiple players can select the same characters.
 
 ## Installation
 - Download [BepInEx](https://github.com/BepInEx/BepInEx/releases) for your platform (windows64 or linux) (UCH is a x64 program)
-- Download [the latest EvenMorePlayers release (MorePlayersMod-0.0.0.7.zip)](https://github.com/batram/UCH-EvenMorePlayers/releases) 
+- Download [the latest EvenMorePlayers release (MorePlayersMod-x.x.x.x.zip)](https://github.com/batram/UCH-EvenMorePlayers/releases) 
 - Put all the contents inside the zip files into your `Ultimate Chicken Horse` folder found via `Steam -> Manage -> Browse Local Files`.
 Run game! (Linux users need an additional step, follow instructions in BepInEx)
 
