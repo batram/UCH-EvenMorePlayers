@@ -1,13 +1,7 @@
 # Even More Players
-This is an `Ultimate Chicken Horse` `BepInEx` mod that allows for more than 4 players to play local and online. WIP.
+This is an `Ultimate Chicken Horse` `BepInEx` mod that allows for more than 4 players to play local and online.
 
 [Watch the video](https://user-images.githubusercontent.com/1382274/167601047-5b48eaa5-2b1d-42b3-8db4-5b271f7f2475.mp4)
-
-
-```
-P2P: 100? players (maybe)
-Unity Matchmaking: 8 players (limited by server side Unity Relay?)
-```
 
 All players need the mod.
 The mod is disabled in normal Online play and only enabled when playing online via the "More" button.
@@ -24,7 +18,8 @@ Multiple players can select the same characters.
 - Put all the contents inside the zip files into your `Ultimate Chicken Horse` folder found via `Steam -> Manage -> Browse Local Files`.
 Run game! (Linux users need an additional step, follow instructions in BepInEx)
 
-
+## Help
+If you have questions, comments or suggestions join the [UCH Mods discord](https://discord.gg/9a44q3JA)
 
 ## Credits
 - [Clever Endeavour Games](https://www.cleverendeavourgames.com/)
