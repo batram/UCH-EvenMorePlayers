@@ -19,7 +19,7 @@ Multiple players can select the same characters.
 Run game! (Linux users need an additional step, follow instructions in BepInEx)
 
 ## Help
-If you have questions, comments or suggestions join the [UCH Mods discord](https://discord.gg/9a44q3JA)
+If you have questions, comments or suggestions join the [UCH Mods discord](https://discord.gg/GgzDQW6zbq)
 
 ## Credits
 - [Clever Endeavour Games](https://www.cleverendeavourgames.com/)
