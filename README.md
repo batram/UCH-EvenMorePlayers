@@ -12,7 +12,11 @@ Multiple players can select the same characters.
 
 <img src="https://user-images.githubusercontent.com/1382274/175807653-008070e2-1e49-4d21-8df5-0f36ef5b2c50.png" width="450px">
 
-## Installation
+
+## Thunderstore installation
+The mod is available via [thunderstore.io](https://thunderstore.io/c/ultimate-chicken-horse/p/murks/Even_More_Players/) and can be installed using [r2modman](https://github.com/ebkr/r2modmanPlus/releases/latest).
+
+## Manual installation
 - Download [BepInEx Version 5](https://github.com/BepInEx/BepInEx/releases/latest) for your platform (windows64 or linux) (UCH is a x64 program)
 - Download [the latest EvenMorePlayers release (MorePlayersMod-x.x.x.x.zip)](https://github.com/batram/UCH-EvenMorePlayers/releases) 
 - Put all the contents inside the zip files into your `Ultimate Chicken Horse` folder found via `Steam -> Manage -> Browse Local Files`.
