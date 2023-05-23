@@ -23,8 +23,12 @@ namespace MorePlayers
             harmony.Patch(accept_original, prefix: new HarmonyMethod(accept_prefix));
 
             var onlinestate_original = typeof(TabletMainMenuOnlineIndicator).GetMethod("SetPlayOnlineButtonState", BindingFlags.NonPublic | BindingFlags.Instance);
-            var onlinestate_prefix = typeof(TabletMainMenuOnlineIndicatorCtorPatch).GetMethod("Postfix");
+            var onlinestate_prefix = typeof(TabletMainMenuOnlineIndicatorCtorPatch).GetMethod("Prefix");
             harmony.Patch(onlinestate_original, prefix: new HarmonyMethod(onlinestate_prefix));
+
+            var version_original = typeof(GameSettings).GetMethod("get_VersionNumber");
+            var version_prefix = typeof(GameSettingsVersionCtorPatch).GetMethod("Prefix");
+            harmony.Patch(version_original, prefix: new HarmonyMethod(version_prefix));
         }
     }
 
@@ -34,13 +38,11 @@ namespace MorePlayers
         static public void Prefix(TabletButton __instance)
         {
             Debug.Log("Pressed da button: " + __instance.gameObject.name);
-            string mod_version = " [EvenMorePlayers: " + MorePlayersMod.mod_version + "]";
-
             if (__instance.gameObject.name == "Play More")
             {
-                if (!GameSettings.GetInstance().versionNumber.Contains(mod_version))
+                if (!GameSettings.GetInstance().versionNumber.Contains(MorePlayersMod.mod_version_full))
                 {
-                    GameSettings.GetInstance().versionNumber += mod_version;
+                    GameSettings.GetInstance().versionNumber = GameSettings.GetInstance().VersionNumber + MorePlayersMod.mod_version_full;
                     if (PlayerManager.maxPlayers != MorePlayersMod.newPlayerLimit)
                     {
                         PlayerManager.maxPlayers = MorePlayersMod.newPlayerLimit;
@@ -113,7 +115,7 @@ namespace MorePlayers
     
     static class TabletMainMenuHomeScoochButtonsCtorPatch
     {
-        static public void Postfix()
+        static public void Postfix(PickableMainMenuButton __instance)
         {
             GameObject more_button = GameObject.Find("main Buttons/Play More");
             if (more_button && more_button.transform.localScale.x != 1.015f)
@@ -137,7 +139,7 @@ namespace MorePlayers
 
     static class TabletMainMenuOnlineIndicatorCtorPatch
     {
-        static public void Postfix(bool spinnerActive, bool buttonActive)
+        static public void Prefix(bool spinnerActive, bool buttonActive)
         {
             GameObject more_button = GameObject.Find("main Buttons/Play More");
             if (more_button)
@@ -152,6 +154,21 @@ namespace MorePlayers
                     more_button.transform.Find("Image2").GetComponent<Image>().color = tb.labelImage.color;
                 }
             }
+        }
+    }
+    
+    static class GameSettingsVersionCtorPatch
+    {
+        static public bool Prefix(GameSettings __instance, ref string __result)
+        {
+            if (GameSettings.GetInstance().versionNumber.Contains(MorePlayersMod.mod_version_full))
+            {
+                __result = GameSettings.GetInstance().versionNumber;
+                return false;
+            }
+
+            __result = I2.Loc.ScriptLocalization.CurrentVersion;
+            return false;
         }
     }
 }

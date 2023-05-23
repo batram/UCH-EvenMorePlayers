@@ -9,19 +9,20 @@ using UnityEngine;
 using UnityEngine.Networking;
 using UnityEngine.Networking.Match;
 
-[assembly: AssemblyVersion("0.9.0.1")]
-[assembly: AssemblyInformationalVersion("0.9.0.1")]
+[assembly: AssemblyVersion("0.9.0.2")]
+[assembly: AssemblyInformationalVersion("0.9.0.2")]
 
 namespace MorePlayers
 {
-    [BepInPlugin("notfood.MorePlayers", "EvenMorePlayers", "0.9.0.1")]
+    [BepInPlugin("notfood.MorePlayers", "EvenMorePlayers", "0.9.0.2")]
     public class MorePlayersMod : BaseUnityPlugin
     {
         public const int newPlayerLimit = 100;
 
         public static bool fullDebug = true;
         public static string og_version;
-        public static string mod_version = "0.9.0.1";
+        public static string mod_version = "0.9.0.2";
+        public static string mod_version_full = " [EvenMorePlayers: " + mod_version + "]";
 
         void Awake()
         {
