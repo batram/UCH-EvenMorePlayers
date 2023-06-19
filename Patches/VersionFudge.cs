@@ -9,7 +9,7 @@ namespace MorePlayers
     {
         static void Postfix(TabletMainMenuHome __instance)
         {
-            bool needs_update = GameState.GetLocalizationVersionNumber() != MorePlayersMod.og_version;
+            bool needs_update = !MorePlayersMod.og_version.StartsWith(GameState.GetLocalizationVersionNumber());
             __instance.showingPleaseUpdate = needs_update;
             __instance.pleaseUpdateButton.gameObject.SetActive(needs_update);
         }
