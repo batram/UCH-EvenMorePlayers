@@ -118,21 +118,26 @@ namespace MorePlayers
         static public void Postfix(PickableMainMenuButton __instance)
         {
             GameObject more_button = GameObject.Find("main Buttons/Play More");
-            if (more_button && more_button.transform.localScale.x != 1.015f)
+            if (more_button)
             {
-                Debug.Log("damn buttons will not move!!");
                 //Adjust local button
                 GameObject play_local = GameObject.Find("main Buttons/Play");
                 play_local.transform.localPosition = new Vector2(-320f, play_local.transform.localPosition.y);
                 play_local.transform.localScale = new Vector3(1.015f, 1, 1);
+                var local_label = play_local.transform.Find("Text Label").GetComponent<TabletTextLabel>();
+                local_label.text = "Local";
 
                 //Adjust online button
                 GameObject play_online = GameObject.Find("main Buttons/Play Online");
                 play_online.transform.localScale = new Vector3(1.015f, 1, 1);
+                var online_label = play_online.transform.Find("Text Label").GetComponent<TabletTextLabel>();
+                online_label.text = "Online";
 
                 //Adjust more button
                 more_button.transform.localScale = new Vector3(1.015f, 1, 1);
                 more_button.transform.localPosition = new Vector2(320f, more_button.transform.localPosition.y);
+                var more_label = more_button.transform.Find("Text Label").GetComponent<TabletTextLabel>();
+                more_label.text = "More";
             }
         }
     }
