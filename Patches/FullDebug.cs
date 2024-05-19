@@ -10,7 +10,7 @@ namespace MorePlayers
     {
         static void Postfix()
         {
-            if (MorePlayersMod.fullDebug)
+            if (MorePlayersMod.fullDebug.Value)
             {
                 LogFilter.currentLogLevel = 0;
                 Debug.logger.logEnabled = true;

@@ -1,4 +1,5 @@
 using BepInEx;
+using BepInEx.Configuration;
 using HarmonyLib;
 using InControl;
 using System;
@@ -14,21 +15,25 @@ using UnityEngine.Networking.Match;
 
 namespace MorePlayers
 {
-    [BepInPlugin("notfood.MorePlayers", "EvenMorePlayers", "0.9.0.2")]
+    [BepInPlugin("EvenMorePlayers", "EvenMorePlayers", "0.9.0.2")]
     public class MorePlayersMod : BaseUnityPlugin
     {
-        public const int newPlayerLimit = 100;
+        public static ConfigEntry<int> newPlayerLimit;
+        public static ConfigEntry<bool> fullDebug;
 
-        public static bool fullDebug = true;
         public static string og_version;
+
         public static string mod_version = "0.9.0.2";
         public static string mod_version_full = " [EvenMorePlayers: " + mod_version + "]";
 
         void Awake()
         {
+            newPlayerLimit = Config.Bind("General", "newPlayerLimit", 100, "Maximum number of Players");
+            fullDebug = Config.Bind("General", "fullDebug", false, "Enable more lines in debug output");
+
             og_version = GameSettings.GetInstance().versionNumber;
-            PlayerManager.maxPlayers = newPlayerLimit;
-            new Harmony("notfood.MorePlayers.PlayerNumPatch").PatchAll();
+            PlayerManager.maxPlayers = newPlayerLimit.Value;
+            new Harmony("EvenMorePlayers.PlayerNumPatch").PatchAll();
             MenuPatch.PatchMenu();
             Debug.Log("[MorePlayersMod] started.");
         }
