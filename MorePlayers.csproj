@@ -75,8 +75,9 @@
   <PropertyGroup>
     <PostBuildEvent>
       if not exist  "$(UCHfolder)\BepInEx\plugins\" mkdir "$(UCHfolder)\BepInEx\plugins\"
-      if not exist  "$(UCHfolder)\BepInEx\plugins\MorePlayers\" mkdir "$(UCHfolder)\BepInEx\plugins\MorePlayers\"
-      copy "MorePlayersMod.dll" "$(UCHfolder)\BepInEx\plugins\MorePlayers" /y
+      if not exist  "$(UCHfolder)\BepInEx\plugins\MorePlayersMod\" mkdir "$(UCHfolder)\BepInEx\plugins\MorePlayersMod\"
+      copy "MorePlayersMod.dll" "$(UCHfolder)\BepInEx\plugins\MorePlayersMod\MorePlayersMod.dll" /y
+      explorer.exe steam://rungameid/386940
   </PostBuildEvent>
   </PropertyGroup>
 
