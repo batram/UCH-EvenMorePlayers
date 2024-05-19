@@ -9,7 +9,7 @@ namespace MorePlayers
     {
         static public void PatchMenu()
         {
-            var harmony = new Harmony("notfood.MorePlayers.MenuPatch");
+            var harmony = new Harmony("EvenMorePlayers.MenuPatch");
             var original = typeof(TabletMainMenuHome).GetMethod(nameof(TabletMainMenuHome.Initialize));
             var postfix = typeof(TabletMainMenuHomeCtorPatch).GetMethod(nameof(TabletMainMenuHomeCtorPatch.Postfix));
             harmony.Patch(original, postfix: new HarmonyMethod(postfix));
@@ -46,7 +46,7 @@ namespace MorePlayers
                     if (PlayerManager.maxPlayers != MorePlayersMod.newPlayerLimit.Value)
                     {
                         PlayerManager.maxPlayers = MorePlayersMod.newPlayerLimit.Value;
-                        new Harmony("notfood.MorePlayers.PlayerNumPatch").PatchAll();
+                        new Harmony("EvenMorePlayers.PlayerNumPatch").PatchAll();
                     }
                 }
             }
@@ -54,7 +54,7 @@ namespace MorePlayers
             {
                 GameSettings.GetInstance().versionNumber = MorePlayersMod.og_version;
                 PlayerManager.maxPlayers = 4;
-                Harmony.UnpatchID("notfood.MorePlayers.PlayerNumPatch");
+                Harmony.UnpatchID("EvenMorePlayers.PlayerNumPatch");
                 MoreCode.CleanGUI();
             }
         }
