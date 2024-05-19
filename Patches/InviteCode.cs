@@ -12,6 +12,8 @@ namespace MorePlayers
         public const char Marker = 'M';
         public const string Stars = "*****";
 
+        public static float lastCodeInputFocus = 0;
+
         public static bool IsValid(string code)
         {
             return code.Length == 5 && (code[0] == Marker || code[0] == Char.ToLower(Marker));
@@ -79,8 +81,23 @@ namespace MorePlayers
             switch (__instance.job)
             {
                 case PickableNetworkButton.NetworkButtonJobs.EnterLobbyCode:
+                    if (__instance.inputField.isFocused)
+                    {
+                        MoreCode.lastCodeInputFocus = 0.15f;
+                    } else
+                    {
+                        if(MoreCode.lastCodeInputFocus > 0)
+                        {
+                            MoreCode.lastCodeInputFocus -= Time.deltaTime;
+                        }
+                    }
                     __instance.inputField.characterLimit = 5;
                     ((Text)__instance.inputField.placeholder).text = MoreCode.Fudge("ABCD");
+                    if (Input.GetKeyDown(KeyCode.Return) && MoreCode.IsValid(__instance.inputField.text) && MoreCode.lastCodeInputFocus > 0)
+                    {
+                        UserMessageManager.Instance.UserMessage("trying to join: " + __instance.inputField.text, 2f, UserMessageManager.UserMsgPriority.lo, true);
+                        MoreCode.FudgeJoin(__instance, __instance.inputField.text);
+                    }
                     __instance.Show(true);
                     return false;
                 case PickableNetworkButton.NetworkButtonJobs.JoinLobbyByCode:

@@ -63,6 +63,9 @@
     <Reference Include="UnityEngine.IMGUIModule">
       <HintPath>$(UCHfolder)\UltimateChickenHorse_Data\Managed\UnityEngine.IMGUIModule.dll</HintPath>
     </Reference>
+    <Reference Include="UnityEngine.InputLegacyModule">
+      <HintPath>$(UCHfolder)\UltimateChickenHorse_Data\Managed\UnityEngine.InputLegacyModule.dll</HintPath>
+    </Reference>
   </ItemGroup>
 
   <ItemGroup>
