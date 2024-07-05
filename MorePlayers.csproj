@@ -20,56 +20,57 @@
   
   <ItemGroup>
     <PackageReference Include="Krafs.Publicizer" Version="1.0.1" />
-    <Reference Include="Assembly-CSharp">
+    <Reference Include="Assembly-CSharp" Private="false">
       <HintPath>$(UCHfolder)\UltimateChickenHorse_Data\Managed\Assembly-CSharp.dll</HintPath>
     </Reference>
-    <Reference Include="BepInEx">
+    <Reference Include="BepInEx" Private="false">
       <HintPath>$(UCHfolder)\BepInEx\core\BepInEx.dll</HintPath>
       <Private>False</Private>
     </Reference>
-    <Reference Include="0Harmony">
+    <Reference Include="0Harmony" Private="false">
       <HintPath>$(UCHfolder)\BepInEx\core\0Harmony.dll</HintPath>
       <Private>False</Private>
     </Reference>
-    <Reference Include="com.unity.multiplayer-hlapi.Runtime">
+    <Reference Include="com.unity.multiplayer-hlapi.Runtime" Private="false">
       <HintPath>$(UCHfolder)\UltimateChickenHorse_Data\Managed\com.unity.multiplayer-hlapi.Runtime.dll</HintPath>
     </Reference>
-    <Reference Include="GameSparks.Api">
+    <Reference Include="GameSparks.Api" Private="false">
       <HintPath>$(UCHfolder)\UltimateChickenHorse_Data\Managed\GameSparks.Api.dll</HintPath>
     </Reference>
-    <Reference Include="InControl">
+    <Reference Include="InControl" Private="false">
       <HintPath>$(UCHfolder)\UltimateChickenHorse_Data\Managed\InControl.dll</HintPath>
     </Reference>
-    <Reference Include="UnityEngine">
+    <Reference Include="UnityEngine" Private="false">
       <HintPath>$(UCHfolder)\UltimateChickenHorse_Data\Managed\UnityEngine.dll</HintPath>
       <Private>False</Private>
     </Reference>
-    <Reference Include="UnityEngine.CoreModule">
+    <Reference Include="UnityEngine.CoreModule" Private="false">
       <HintPath>$(UCHfolder)\UltimateChickenHorse_Data\Managed\UnityEngine.CoreModule.dll</HintPath>
       <Private>False</Private>
     </Reference>
-    <Reference Include="UnityEngine.Physics2DModule">
+    <Reference Include="UnityEngine.Physics2DModule" Private="false">
       <HintPath>$(UCHfolder)\UltimateChickenHorse_Data\Managed\UnityEngine.Physics2DModule.dll</HintPath>
     </Reference>
-    <Reference Include="UnityEngine.UI">
+    <Reference Include="UnityEngine.UI" Private="false">
       <HintPath>$(UCHfolder)\UltimateChickenHorse_Data\Managed\UnityEngine.UI.dll</HintPath>
     </Reference>
-    <Reference Include="UnityEngine.UNETModule">
+    <Reference Include="UnityEngine.UNETModule" Private="false">
       <HintPath>$(UCHfolder)\UltimateChickenHorse_Data\Managed\UnityEngine.UNETModule.dll</HintPath>
     </Reference>
-    <Reference Include="UnityEngine.UnityWebRequestModule">
+    <Reference Include="UnityEngine.UnityWebRequestModule" Private="false">
       <HintPath>$(UCHfolder)\UltimateChickenHorse_Data\Managed\UnityEngine.UnityWebRequestModule.dll</HintPath>
     </Reference>
-    <Reference Include="UnityEngine.IMGUIModule">
+    <Reference Include="UnityEngine.IMGUIModule" Private="false">
       <HintPath>$(UCHfolder)\UltimateChickenHorse_Data\Managed\UnityEngine.IMGUIModule.dll</HintPath>
     </Reference>
-    <Reference Include="UnityEngine.InputLegacyModule">
+    <Reference Include="UnityEngine.InputLegacyModule" Private="false">
       <HintPath>$(UCHfolder)\UltimateChickenHorse_Data\Managed\UnityEngine.InputLegacyModule.dll</HintPath>
     </Reference>
   </ItemGroup>
 
   <ItemGroup>
     <Publicize Include="Assembly-CSharp" />
+    <Publicize Include="InControl" />
   </ItemGroup>
   
   <PropertyGroup>

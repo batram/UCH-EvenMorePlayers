@@ -38,7 +38,7 @@ namespace MorePlayers
     {
 
     }
-
+    
     [HarmonyPatch(typeof(LevelSelectController), nameof(LevelSelectController.RpcResetCharacter))]
     static class LevelSelectControllerRpcResetCharacterCtorPatch
     {
@@ -62,13 +62,12 @@ namespace MorePlayers
     {
         static void Prefix(Character __instance)
         {
-            //Turn on all colliders, fix for collision modifier
+            //Turn on all colliders, fix for collision modifier, needed on client
             foreach (BoxCollider2D c in __instance.gameObject.GetComponents<BoxCollider2D>())
             {
                 c.enabled = true;
             }
 
-            //RefreshScale: fix for collision modifier
             __instance.RefreshScale();
         }
     }
@@ -148,7 +147,7 @@ namespace MorePlayers
         static void Postfix(Character __instance, ref int[] __result)
         {
             var netid = (int)__instance.GetComponent<NetworkIdentity>()?.netId.Value;
-            if (netid != null && netid != 0)
+            if (netid != 0)
             {
                 Array.Resize<int>(ref __result, __result.Length + 1);
                 __result[__result.Length - 1] = netid;

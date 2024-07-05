@@ -73,7 +73,7 @@ namespace MorePlayers
             yield return AccessTools.Method(typeof(TurnIndicator), nameof(TurnIndicator.SetPlayerCount));
             yield return AccessTools.Method(typeof(UnityMatchmaker), nameof(UnityMatchmaker.CheckHostConnectivity));
             //yield return AccessTools.Method(typeof(UnityMatchmaker), nameof(UnityMatchmaker.CreateUnityMatch));
-            yield return AccessTools.Method(typeof(VersusControl), "get_playersLeftToPlace");            
+            yield return AccessTools.Method(typeof(VersusControl), "get_playersLeftToPlace");
         }
 
         static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> e)
@@ -282,7 +282,7 @@ namespace MorePlayers
             return false;
         }
     }
-
+    
     [HarmonyPatch(typeof(LevelSelectController), nameof(LevelSelectController.Awake))]
     static class LevelSelectControllerCtorPatch
     {
@@ -480,6 +480,16 @@ namespace MorePlayers
         }
     }
 
+    [HarmonyPatch(typeof(InputManager), "get_NativeInputEnableXInput")]
+    static class NativeInputEnableXInputInputManagerCtorPatch
+    {
+        static void Postfix(ref bool __result)
+        {
+            Debug.Log("InputManager.NativeInputEnableXInput");
+            __result = false;
+        }
+    }
+
     [HarmonyPatch(typeof(LevelPortal), nameof(LevelPortal.Awake))]
     static class LevelPortalCtorPatch
     {
@@ -594,7 +604,7 @@ namespace MorePlayers
             }
         }
     }
-
+    
     [HarmonyPatch(typeof(GameControl), nameof(GameControl.ReceiveEvent))]
     static class GameControlReceiveEventCtorPatch
     {
