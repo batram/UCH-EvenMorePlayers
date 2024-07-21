@@ -361,7 +361,6 @@ namespace MorePlayers
         }
     }
 
-
     [HarmonyPatch(typeof(LobbySkillTracker), nameof(LobbySkillTracker.Start))]
     static class LobbySkillTrackerCtorPatch
     {
@@ -380,6 +379,31 @@ namespace MorePlayers
             Debug.Log("patch VersusControl " + PlayerManager.maxPlayers);
             __instance.winOrder = new GamePlayer[PlayerManager.maxPlayers];
             __instance.RemainingPlacements = new int[PlayerManager.maxPlayers];
+        }
+    }
+
+    [HarmonyPatch(typeof(VersusControl), nameof(VersusControl.ShuffleStartPosition))]
+    public class VersusControlShuffleStartPositionCtorPatch
+    {
+        static bool Prefix(VersusControl __instance)
+        {
+            List<int> list = new List<int>();
+            for (int i = 0; i < __instance.PlayerQueue.Count; i++)
+            {
+                list.Add((i % 4) + 1);
+            }
+            var randr = "";
+            for (int j = 0; j < __instance.PlayerQueue.Count; j++)
+            {
+                int index = UnityEngine.Random.Range(0, list.Count);
+                int num2 = list[index];
+                randr += num2.ToString();
+                list.RemoveAt(index);
+            }
+
+            __instance.NetworkRandomStartPositionString = randr;
+
+            return false;
         }
     }
 
