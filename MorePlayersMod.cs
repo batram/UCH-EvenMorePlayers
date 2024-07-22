@@ -11,7 +11,7 @@ using UnityEngine.Networking;
 using UnityEngine.Networking.Match;
 
 [assembly: AssemblyVersion("0.9.0.2")]
-[assembly: AssemblyInformationalVersion("0.9.0.2.4")]
+[assembly: AssemblyInformationalVersion("0.9.0.2.5")]
 
 namespace MorePlayers
 {
