@@ -378,6 +378,7 @@ namespace MorePlayers
             {
                 if (ca.Picked && !ca.Sitting)
                 {
+                    ca.frozen = false;
                     __instance.MainCamera.AddTarget(ca);
                     num++;
                     ca.SetLobbyCollider(true);
