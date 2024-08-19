@@ -78,7 +78,8 @@
       if not exist  "$(UCHfolder)\BepInEx\plugins\" mkdir "$(UCHfolder)\BepInEx\plugins\"
       if not exist  "$(UCHfolder)\BepInEx\plugins\MorePlayersMod\" mkdir "$(UCHfolder)\BepInEx\plugins\MorePlayersMod\"
       copy "MorePlayersMod.dll" "$(UCHfolder)\BepInEx\plugins\MorePlayersMod\MorePlayersMod.dll" /y
-      explorer.exe steam://rungameid/386940
+      
+      start explorer.exe "steam://rungameid/386940"
   </PostBuildEvent>
   </PropertyGroup>
 
