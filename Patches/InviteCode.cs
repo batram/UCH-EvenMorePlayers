@@ -84,9 +84,10 @@ namespace MorePlayers
                     if (__instance.inputField.isFocused)
                     {
                         MoreCode.lastCodeInputFocus = 0.15f;
-                    } else
+                    }
+                    else
                     {
-                        if(MoreCode.lastCodeInputFocus > 0)
+                        if (MoreCode.lastCodeInputFocus > 0)
                         {
                             MoreCode.lastCodeInputFocus -= Time.deltaTime;
                         }
@@ -150,7 +151,7 @@ namespace MorePlayers
             return true;
         }
     }
-    
+
     [HarmonyPatch(typeof(TabletLobbyOptionsScreen), nameof(TabletLobbyOptionsScreen.OnClickShowToggle))]
     static class TabletLobbyOptionsScreenCtorPatch
     {

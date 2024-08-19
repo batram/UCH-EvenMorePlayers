@@ -8,7 +8,6 @@ using System.Reflection;
 using System.Reflection.Emit;
 using UnityEngine;
 using UnityEngine.Networking;
-using UnityEngine.Networking.Match;
 
 [assembly: AssemblyVersion("0.9.0.2")]
 [assembly: AssemblyInformationalVersion("0.9.0.2.5")]
@@ -282,7 +281,7 @@ namespace MorePlayers
             return false;
         }
     }
-    
+
     [HarmonyPatch(typeof(LevelSelectController), nameof(LevelSelectController.Awake))]
     static class LevelSelectControllerCtorPatch
     {
@@ -598,7 +597,7 @@ namespace MorePlayers
         }
     }
 
-    [HarmonyPatch(typeof(NetworkManager), nameof(NetworkManager.StartServer), new Type[] {typeof(ConnectionConfig), typeof(int) })]
+    [HarmonyPatch(typeof(NetworkManager), nameof(NetworkManager.StartServer), new Type[] { typeof(ConnectionConfig), typeof(int) })]
     static class NetworkManagerCtorPatch
     {
         static void Prefix(NetworkManager __instance, int maxConnections)
@@ -628,7 +627,7 @@ namespace MorePlayers
             }
         }
     }
-    
+
     [HarmonyPatch(typeof(GameControl), nameof(GameControl.ReceiveEvent))]
     static class GameControlReceiveEventCtorPatch
     {

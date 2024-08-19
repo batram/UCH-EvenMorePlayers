@@ -1,6 +1,4 @@
 using HarmonyLib;
-using UnityEngine;
-using UnityEngine.Networking;
 
 namespace MorePlayers
 {

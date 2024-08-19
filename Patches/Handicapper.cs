@@ -1,6 +1,5 @@
 using GameEvent;
 using HarmonyLib;
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
@@ -40,16 +39,18 @@ namespace MorePlayers
 
             HandicapLine[] lines = { slot0, slot1, slot2, slot3 };
             int[] playerNumbers = { slot0.PlayerNetworkNumber, slot1.PlayerNetworkNumber, slot2.PlayerNetworkNumber, slot3.PlayerNetworkNumber };
-            playerNumbers = playerNumbers.Where(c => {
+            playerNumbers = playerNumbers.Where(c =>
+            {
                 LobbyPlayer player = LobbyManager.instance.GetLobbyPlayer(c);
-                return (c != networkPlayerNumber && c != -1 && player?.PickedAnimal != Character.Animals.NONE); 
+                return (c != networkPlayerNumber && c != -1 && player?.PickedAnimal != Character.Animals.NONE);
             }).ToArray();
 
-            if(playerNumbers.Length < 4)
+            if (playerNumbers.Length < 4)
             {
                 //add all players with non 100 handicap to list when list is empty
-                foreach (LobbyPlayer player in LobbyManager.instance.GetLobbyPlayers()) { 
-                    if(player?.PickedAnimal != Character.Animals.NONE && player.handicap != 100)
+                foreach (LobbyPlayer player in LobbyManager.instance.GetLobbyPlayers())
+                {
+                    if (player?.PickedAnimal != Character.Animals.NONE && player.handicap != 100)
                     {
                         if (player.networkNumber != networkPlayerNumber && !playerNumbers.Contains(player.networkNumber))
                             playerNumbers = playerNumbers.Append(player.networkNumber).ToArray();
@@ -57,7 +58,7 @@ namespace MorePlayers
                 }
             }
 
-            if(playerNumbers.Length < 4)
+            if (playerNumbers.Length < 4)
             {
                 int[] fillPlayerNumbers = { -1, -1, -1, -1 };
                 for (int x = 0; x < playerNumbers.Length; x++)
@@ -80,7 +81,7 @@ namespace MorePlayers
 
             int[] newPlayerNumbers = { networkPlayerNumber, playerNumbers[0], playerNumbers[1], playerNumbers[2] };
 
-            if(networkPlayerNumber == -1)
+            if (networkPlayerNumber == -1)
             {
                 newPlayerNumbers = playerNumbers;
             }
@@ -158,7 +159,7 @@ namespace MorePlayers
             {
                 HandiShuffle.pushHandicaps(__instance, -1);
             }
-        } 
+        }
     }
 
     [HarmonyPatch(typeof(handicap), nameof(handicap.Start))]
@@ -173,7 +174,7 @@ namespace MorePlayers
             Text titleText = title.GetComponent<Text>();
             titleText.text = "modded Score Balancer";
 
-            foreach(Transform t in __instance.HandicapLineSlots)
+            foreach (Transform t in __instance.HandicapLineSlots)
             {
                 HandicapLine line = t.GetComponentInChildren<HandicapLine>();
 

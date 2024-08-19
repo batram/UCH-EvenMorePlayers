@@ -38,7 +38,7 @@ namespace MorePlayers
     {
 
     }
-    
+
     [HarmonyPatch(typeof(LevelSelectController), nameof(LevelSelectController.RpcResetCharacter))]
     static class LevelSelectControllerRpcResetCharacterCtorPatch
     {

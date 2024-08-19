@@ -112,7 +112,7 @@ namespace MorePlayers
             }
         }
     }
-    
+
     static class TabletMainMenuHomeScoochButtonsCtorPatch
     {
         static public void Postfix(PickableMainMenuButton __instance)
@@ -161,7 +161,7 @@ namespace MorePlayers
             }
         }
     }
-    
+
     static class GameSettingsVersionCtorPatch
     {
         static public bool Prefix(GameSettings __instance, ref string __result)
