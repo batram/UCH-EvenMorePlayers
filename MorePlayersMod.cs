@@ -597,6 +597,7 @@ namespace MorePlayers
         }
     }
 
+    [Obsolete]
     [HarmonyPatch(typeof(NetworkManager), nameof(NetworkManager.StartServer), new Type[] { typeof(ConnectionConfig), typeof(int) })]
     static class NetworkManagerCtorPatch
     {

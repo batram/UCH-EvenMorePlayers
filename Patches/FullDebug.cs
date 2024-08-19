@@ -8,6 +8,7 @@ namespace MorePlayers
     [HarmonyPatch(typeof(StartGameState), nameof(StartGameState.Awake))]
     static class StartGameStateCtorPatch
     {
+        [System.Obsolete]
         static void Postfix()
         {
             if (MorePlayersMod.fullDebug.Value)
