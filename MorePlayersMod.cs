@@ -519,7 +519,6 @@ namespace MorePlayers
         static void Prefix(LevelPortal __instance)
         {
             VoteArrow[] componentsInChildren = __instance.GetComponentsInChildren<VoteArrow>();
-            Debug.Log("VoteArrows " + componentsInChildren.Length);
             if (componentsInChildren.Length != PlayerManager.maxPlayers)
             {
                 int num = componentsInChildren.Length;
