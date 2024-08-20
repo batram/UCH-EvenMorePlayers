@@ -23,7 +23,7 @@ The mod is available via [thunderstore.io](https://thunderstore.io/c/ultimate-ch
 Run game! (Linux users need an additional step, follow instructions in BepInEx)
 
 ## Help
-If you have questions, comments or suggestions join the [UCH Mods discord](https://discord.gg/GgzDQW6zbq)
+If you have questions, comments or suggestions join the [UCH Mods discord](https://discord.gg/DACBGXVww7)
 
 ## Credits
 - [Clever Endeavour Games](https://www.cleverendeavourgames.com/)
