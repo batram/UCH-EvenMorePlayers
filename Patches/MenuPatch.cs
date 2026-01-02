@@ -40,9 +40,9 @@ namespace MorePlayers
             Debug.Log("Pressed da button: " + __instance.gameObject.name);
             if (__instance.gameObject.name == "Play More")
             {
-                if (!GameSettings.GetInstance().versionNumber.Contains(MorePlayersMod.mod_version_full))
+                if (!GameSettings.GetInstance().versionNumber.StartsWith(MorePlayersMod.mod_version_full))
                 {
-                    GameSettings.GetInstance().versionNumber = "XXmodded_" + GameSettings.GetInstance().VersionNumber + MorePlayersMod.mod_version_full;
+                    GameSettings.GetInstance().versionNumber = MorePlayersMod.mod_version_full + "_" + GameSettings.GetInstance().VersionNumber;
                     if (PlayerManager.maxPlayers != MorePlayersMod.newPlayerLimit.Value)
                     {
                         PlayerManager.maxPlayers = MorePlayersMod.newPlayerLimit.Value;
@@ -166,7 +166,7 @@ namespace MorePlayers
     {
         static public bool Prefix(GameSettings __instance, ref string __result)
         {
-            if (GameSettings.GetInstance().versionNumber.Contains(MorePlayersMod.mod_version_full))
+            if (GameSettings.GetInstance().versionNumber.StartsWith(MorePlayersMod.mod_version_full))
             {
                 __result = GameSettings.GetInstance().versionNumber;
                 return false;

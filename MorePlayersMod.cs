@@ -24,7 +24,7 @@ namespace MorePlayers
         public static string og_version;
 
         public static string mod_version = "0.9.0.3";
-        public static string mod_version_full = " [EvenMorePlayers: " + mod_version + "]";
+        public static string mod_version_full = "modded_" + mod_version.Replace(".", "-");
 
         void Awake()
         {
