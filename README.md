@@ -25,6 +25,9 @@ Run game! (Linux users need an additional step, follow instructions in BepInEx)
 ## Help
 If you have questions, comments or suggestions join the [UCH Mods discord](https://discord.gg/DACBGXVww7)
 
+[Tips for Controller issues](https://github.com/batram/UCH-EvenMorePlayers/wiki/Controller-Input-Issues)
+
+
 ## Credits
 - [Clever Endeavour Games](https://www.cleverendeavourgames.com/)
 - [BepInEx](https://github.com/BepInEx/BepInEx) team
