@@ -42,7 +42,7 @@ namespace MorePlayers
             {
                 if (!GameSettings.GetInstance().versionNumber.Contains(MorePlayersMod.mod_version_full))
                 {
-                    GameSettings.GetInstance().versionNumber = GameSettings.GetInstance().VersionNumber + MorePlayersMod.mod_version_full;
+                    GameSettings.GetInstance().versionNumber = "XXmodded_" + GameSettings.GetInstance().VersionNumber + MorePlayersMod.mod_version_full;
                     if (PlayerManager.maxPlayers != MorePlayersMod.newPlayerLimit.Value)
                     {
                         PlayerManager.maxPlayers = MorePlayersMod.newPlayerLimit.Value;
