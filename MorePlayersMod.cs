@@ -20,6 +20,7 @@ namespace MorePlayers
         public static ConfigEntry<int> newPlayerLimit;
         public static ConfigEntry<bool> fullDebug;
         public static ConfigEntry<bool> shuffleScoreBalancer;
+        public static ConfigEntry<bool> moepButton;
 
         public static string og_version;
 
@@ -31,6 +32,7 @@ namespace MorePlayers
             newPlayerLimit = Config.Bind("General", "newPlayerLimit", 100, "Maximum number of Players");
             fullDebug = Config.Bind("General", "fullDebug", false, "Enable more lines in debug output");
             shuffleScoreBalancer = Config.Bind("General", "shuffleScoreBalancer", true, "On the Score Balancer in the Treehouse show the Player that last change it on top");
+            moepButton = Config.Bind("General", "moepButton", true, "moep");
 
             og_version = GameSettings.GetInstance().versionNumber;
             PlayerManager.maxPlayers = newPlayerLimit.Value;
