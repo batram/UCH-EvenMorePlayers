@@ -66,11 +66,27 @@
     <Reference Include="UnityEngine.InputLegacyModule" Private="false">
       <HintPath>$(UCHfolder)\UltimateChickenHorse_Data\Managed\UnityEngine.InputLegacyModule.dll</HintPath>
     </Reference>
+    <Reference Include="UnityEngine.AnimationModule" Private="false">
+      <HintPath>$(UCHfolder)\UltimateChickenHorse_Data\Managed\UnityEngine.AnimationModule.dll</HintPath>
+    </Reference>
+   <Reference Include="UnityEngine.ImageConversionModule">
+      <HintPath>$(UCHfolder)\UltimateChickenHorse_Data\Managed\UnityEngine.ImageConversionModule.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="AK.Wwise.Unity.API">
+      <HintPath>$(UCHfolder)\UltimateChickenHorse_Data\Managed\AK.Wwise.Unity.API.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
   </ItemGroup>
 
   <ItemGroup>
     <Publicize Include="Assembly-CSharp" />
     <Publicize Include="InControl" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Patches/assets/moep.bnk" />
+    <EmbeddedResource Include="Patches/assets/glassb.png" />
   </ItemGroup>
   
   <PropertyGroup>
