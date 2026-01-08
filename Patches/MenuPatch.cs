@@ -43,6 +43,8 @@ namespace MorePlayers
                 if (!GameSettings.GetInstance().versionNumber.StartsWith(MorePlayersMod.mod_version_full))
                 {
                     GameSettings.GetInstance().versionNumber = MorePlayersMod.mod_version_full + "_" + GameSettings.GetInstance().VersionNumber;
+                    // Reset parsedMatchmakingNumber to force recalculation
+                    GameSettings.GetInstance().parsedMatchmakingNumber = null;
                     if (PlayerManager.maxPlayers != MorePlayersMod.newPlayerLimit.Value)
                     {
                         PlayerManager.maxPlayers = MorePlayersMod.newPlayerLimit.Value;
@@ -53,6 +55,8 @@ namespace MorePlayers
             else if (__instance.gameObject.name == "Play Online")
             {
                 GameSettings.GetInstance().versionNumber = MorePlayersMod.og_version;
+                // Reset parsedMatchmakingNumber to force recalculation
+                GameSettings.GetInstance().parsedMatchmakingNumber = null;
                 PlayerManager.maxPlayers = 4;
                 Harmony.UnpatchID("EvenMorePlayers.PlayerNumPatch");
                 MoreCode.CleanGUI();
