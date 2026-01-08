@@ -14,8 +14,6 @@
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
     <DebugType>None</DebugType>
-    <ReleaseVersion>0.4.8</ReleaseVersion>
-	  <AssemblyVersion>0.0.0.7</AssemblyVersion>
   </PropertyGroup>
   
   <ItemGroup>
