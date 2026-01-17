@@ -22,9 +22,20 @@ namespace MorePlayers
             new_character.gameObject.transform.parent = null;
 
             //Remove all original ArtMatches, new ones are added during pick event (breaks outfit selection)
+            // First, clean up any existing outfit GameObjects to prevent duplicates
             var arties = new_character.GetComponentsInChildren<ArtMatcher>();
             for (var i = 0; i < arties.Length; i++)
             {
+                if (arties[i].outfits != null)
+                {
+                    foreach (var outfit in arties[i].outfits)
+                    {
+                        if (outfit != null && outfit.outputSpriteGameObject != null)
+                        {
+                            UnityEngine.Object.Destroy(outfit.outputSpriteGameObject);
+                        }
+                    }
+                }
                 UnityEngine.Object.Destroy(arties[i].gameObject);
             }
 
