@@ -25,10 +25,6 @@ namespace MorePlayers
             var onlinestate_original = typeof(TabletMainMenuOnlineIndicator).GetMethod("SetPlayOnlineButtonState", BindingFlags.NonPublic | BindingFlags.Instance);
             var onlinestate_prefix = typeof(TabletMainMenuOnlineIndicatorCtorPatch).GetMethod("Prefix");
             harmony.Patch(onlinestate_original, prefix: new HarmonyMethod(onlinestate_prefix));
-
-            var version_original = typeof(GameSettings).GetMethod("get_VersionNumber");
-            var version_prefix = typeof(GameSettingsVersionCtorPatch).GetMethod("Prefix");
-            harmony.Patch(version_original, prefix: new HarmonyMethod(version_prefix));
         }
     }
 
@@ -42,13 +38,13 @@ namespace MorePlayers
             {
                 if (!GameSettings.GetInstance().versionNumber.StartsWith(MorePlayersMod.mod_version_full))
                 {
-                    GameSettings.GetInstance().versionNumber = MorePlayersMod.mod_version_full + "_" + GameSettings.GetInstance().VersionNumber;
+                    GameSettings.GetInstance().versionNumber = MorePlayersMod.mod_version_full + "_" + MorePlayersMod.og_version;
                     // drop version patch number, so players on same minor version can play together
                     var vparts = MorePlayersMod.mod_version_full.Split('-');
                     var hparts = MorePlayersMod.og_version.Split('.');
 
                     GameSettings.GetInstance().parsedMatchmakingNumber = vparts[0] + "-" + vparts[1] + "_" + hparts[0] + "." + hparts[1];
-
+                    GameSettings.GetInstance().parsedVersionNumberProd = null;
 
                     if (PlayerManager.maxPlayers != MorePlayersMod.newPlayerLimit.Value)
                     {
@@ -62,6 +58,8 @@ namespace MorePlayers
                 GameSettings.GetInstance().versionNumber = MorePlayersMod.og_version;
                 // Reset parsedMatchmakingNumber to force recalculation
                 GameSettings.GetInstance().parsedMatchmakingNumber = null;
+                GameSettings.GetInstance().parsedVersionNumberProd = null;
+
                 PlayerManager.maxPlayers = 4;
                 Harmony.UnpatchID("EvenMorePlayers.PlayerNumPatch");
                 MoreCode.CleanGUI();
@@ -168,20 +166,6 @@ namespace MorePlayers
                     more_button.transform.Find("Image2").GetComponent<Image>().color = tb.labelImage.color;
                 }
             }
-        }
-    }
-
-    static class GameSettingsVersionCtorPatch
-    {
-        static public bool Prefix(GameSettings __instance, ref string __result)
-        {
-            if (GameSettings.GetInstance().versionNumber.StartsWith(MorePlayersMod.mod_version_full))
-            {
-                __result = GameSettings.GetInstance().versionNumber;
-                return false;
-            }
-
-            return true;
         }
     }
 }
