@@ -9,12 +9,12 @@ using System.Reflection.Emit;
 using UnityEngine;
 using UnityEngine.Networking;
 
-[assembly: AssemblyVersion("10.0.0.0")]
-[assembly: AssemblyInformationalVersion("10.0.0.0")]
+[assembly: AssemblyVersion("10.0.0")]
+[assembly: AssemblyInformationalVersion("10.0.0")]
 
 namespace MorePlayers
 {
-    [BepInPlugin("EvenMorePlayers", "EvenMorePlayers", "10.0.0.0")]
+    [BepInPlugin("EvenMorePlayers", "EvenMorePlayers", "10.0.0")]
     public class MorePlayersMod : BaseUnityPlugin
     {
         public static ConfigEntry<int> newPlayerLimit;
@@ -23,7 +23,7 @@ namespace MorePlayers
 
         public static string og_version;
 
-        public static string mod_version = "10.0.0.0";
+        public static string mod_version = "10.0.0";
         public static string mod_version_full = "modded_" + mod_version.Replace(".", "-");
 
         void Awake()
