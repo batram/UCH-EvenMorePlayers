@@ -43,8 +43,13 @@ namespace MorePlayers
                 if (!GameSettings.GetInstance().versionNumber.StartsWith(MorePlayersMod.mod_version_full))
                 {
                     GameSettings.GetInstance().versionNumber = MorePlayersMod.mod_version_full + "_" + GameSettings.GetInstance().VersionNumber;
-                    // Reset parsedMatchmakingNumber to force recalculation
-                    GameSettings.GetInstance().parsedMatchmakingNumber = null;
+                    // drop version patch number, so players on same minor version can play together
+                    var vparts = MorePlayersMod.mod_version_full.Split('-');
+                    var hparts = MorePlayersMod.og_version.Split('.');
+
+                    GameSettings.GetInstance().parsedMatchmakingNumber = vparts[0] + "-" + vparts[1] + "_" + hparts[0] + "." + hparts[1];
+
+
                     if (PlayerManager.maxPlayers != MorePlayersMod.newPlayerLimit.Value)
                     {
                         PlayerManager.maxPlayers = MorePlayersMod.newPlayerLimit.Value;

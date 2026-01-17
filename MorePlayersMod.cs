@@ -17,14 +17,14 @@ namespace MorePlayers
     [BepInPlugin("EvenMorePlayers", "EvenMorePlayers", "10.0.0")]
     public class MorePlayersMod : BaseUnityPlugin
     {
+        public static string mod_version = "10.0.0";
+        public static string mod_version_full = "modded_" + mod_version.Replace(".", "-");
+
         public static ConfigEntry<int> newPlayerLimit;
         public static ConfigEntry<bool> fullDebug;
         public static ConfigEntry<bool> shuffleScoreBalancer;
 
         public static string og_version;
-
-        public static string mod_version = "10.0.0";
-        public static string mod_version_full = "modded_" + mod_version.Replace(".", "-");
 
         void Awake()
         {
