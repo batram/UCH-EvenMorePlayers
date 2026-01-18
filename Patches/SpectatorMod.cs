@@ -847,5 +847,48 @@ namespace MorePlayers
                 return true; // Continue normally
             }
         }
+
+        // Single patch to filter PlayerQueue once after SetupStart completes
+        [HarmonyPatch(typeof(GameControl), nameof(GameControl.SetupStart))]
+        static class GameControlSetupStartPostfixPatch
+        {
+            static void Postfix(GameControl __instance, GameState.GameMode mode)
+            {
+                if (!MorePlayersMod.spectatorMode.Value)
+                    return;
+
+                try
+                {
+                    int originalCount = __instance.PlayerQueue.Count;
+                    if (originalCount == 0)
+                        return;
+
+                    // Filter spectators out of PlayerQueue once
+                    Queue<GamePlayer> filteredQueue = new Queue<GamePlayer>();
+                    GamePlayer[] players = __instance.PlayerQueue.ToArray();
+
+                    foreach (GamePlayer player in players)
+                    {
+                        if (!IsSpectator(player.networkNumber))
+                        {
+                            filteredQueue.Enqueue(player);
+                        }
+                        else
+                        {
+                            Debug.Log($"[SpectatorMod] Filtered spectator {player.networkNumber} from PlayerQueue");
+                        }
+                    }
+
+                    // Replace queue with filtered version
+                    __instance.PlayerQueue = filteredQueue;
+                    Debug.Log($"[SpectatorMod] Filtered PlayerQueue: {originalCount} -> {filteredQueue.Count} players");
+
+                }
+                catch (System.Exception ex)
+                {
+                    Debug.LogError($"[SpectatorMod] Error filtering PlayerQueue: {ex.Message}");
+                }
+            }
+        }
     }
 }
