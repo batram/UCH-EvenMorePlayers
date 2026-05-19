@@ -419,7 +419,8 @@ namespace MorePlayers
         {
             if (!GameState.GetInstance().currentSnapshotInfo.snapshotName.NullOrEmpty() || GameState.GetInstance().lastLevelPlayed == GameState.GetLevelSceneName(GameState.LevelName.BLANKLEVEL))
             {
-                foreach (LobbyStartPoint lobbyStartPoint in __instance.StartingPoints)
+                var startingPoints = AccessTools.Field(typeof(LevelSelectController), nameof(LevelSelectController.StartingPoints)).GetValue(__instance) as IEnumerable<LobbyStartPoint>;
+                foreach (LobbyStartPoint lobbyStartPoint in startingPoints)
                 {
                     Character componentInChildren = lobbyStartPoint.GetComponentInChildren<Character>();
                     componentInChildren.PositionCharacter(lobbyStartPoint.transform.position, true);
