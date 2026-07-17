@@ -3,10 +3,14 @@
 ##
 ## Get latest from https://github.com/github/gitignore/blob/master/VisualStudio.gitignore
 
+imgs/
+plugins/
+
 # User-specific files
 *.rsuser
 *.suo
 *.user
+*.user.props
 *.userosscache
 *.sln.docstates
 
@@ -348,3 +352,10 @@ MigrationBackup/
 
 # Ionide (cross platform F# VS Code tools) working folder
 .ionide/
+.agent/rules/decomp.md
+UCH-EvenMorePlayers.code-workspace
+TECH_NOTES.md
+tech_details.md
+SPECTATOR_MODE_README.md
+SPECTATOR_FIX_SUMMARY.md
+EvenMorePlayers.sln
