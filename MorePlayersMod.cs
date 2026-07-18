@@ -24,6 +24,10 @@ namespace MorePlayers
         public static ConfigEntry<bool> fullDebug;
         public static ConfigEntry<bool> shuffleScoreBalancer;
         public static ConfigEntry<bool> spectatorMode;
+        public static ConfigEntry<bool> lateJoinEnabled;
+        public static ConfigEntry<string> lateJoinMode;
+        public static ConfigEntry<bool> lateJoinAutoPick;
+        public static ConfigEntry<bool> lateJoinKeepVisible;
 
         public static string og_version;
 
@@ -33,7 +37,10 @@ namespace MorePlayers
             fullDebug = Config.Bind("General", "fullDebug", false, "Enable more lines in debug output");
             shuffleScoreBalancer = Config.Bind("General", "shuffleScoreBalancer", true, "On the Score Balancer in the Treehouse show the Player that last change it on top");
             spectatorMode = Config.Bind("General", "spectatorMode", true, "Enable spectator mode - join couch in treehouse to spectate");
-
+            lateJoinEnabled = Config.Bind("LateJoin", "lateJoinEnabled", true, "Allow players to join a lobby while a game is already running");
+            lateJoinMode = Config.Bind("LateJoin", "lateJoinMode", "play", "How to enter a running game: 'play' (drop in at the next build phase) or 'spectate' (watch until back in the treehouse)");
+            lateJoinAutoPick = Config.Bind("LateJoin", "lateJoinAutoPick", true, "Automatically pick the first free animal when late joining mid-level (no pick UI in-level)");
+            lateJoinKeepVisible = Config.Bind("LateJoin", "lateJoinKeepVisible", true, "Keep the hosted lobby visible and joinable in the lobby browser while a game is running");
             og_version = GameSettings.GetInstance().versionNumber;
             PlayerManager.maxPlayers = newPlayerLimit.Value;
             new Harmony("EvenMorePlayers.PlayerNumPatch").PatchAll();
@@ -615,6 +622,10 @@ namespace MorePlayers
         static void Postfix(PickableNetworkButton __instance, Matchmaker.LobbyListInfo lobbyInfo)
         {
             __instance.NumPlayersText.text = lobbyInfo.Players.ToString() + "/?";
+            if (MorePlayersMod.lateJoinEnabled != null && MorePlayersMod.lateJoinEnabled.Value && lobbyInfo.matchProgress != 0)
+            {
+                __instance.NumPlayersText.text += " ▶"; // in-progress marker (late-joinable)
+            }
         }
     }
 

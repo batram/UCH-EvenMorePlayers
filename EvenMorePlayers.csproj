@@ -69,21 +69,26 @@
   <ItemGroup>
     <Publicize Include="Assembly-CSharp" />
     <Publicize Include="InControl" />
+    <Publicize Include="com.unity.multiplayer-hlapi.Runtime" />
   </ItemGroup>
   
   <PropertyGroup>
+  <!--       if exist  "\\192.168.2.113\Ultimate Chicken Horse\BepInEx\plugins\MorePlayersMod" copy "MorePlayersMod.dll" "\\192.168.2.113\Ultimate Chicken Horse\BepInEx\plugins\MorePlayersMod\MorePlayersMod.dll" /y
+ -->
+    <!-- Opt in with: dotnet build -p:RestartGameOnBuild=true -->
+    <RestartGameOnBuild Condition="'$(RestartGameOnBuild)' == ''">false</RestartGameOnBuild>
     <PostBuildEvent>
       if not exist  "$(UCHfolder)\BepInEx\plugins\" mkdir "$(UCHfolder)\BepInEx\plugins\"
       if not exist  "$(UCHfolder)\BepInEx\plugins\MorePlayersMod\" mkdir "$(UCHfolder)\BepInEx\plugins\MorePlayersMod\"
-      if exist  "\\192.168.2.113\Ultimate Chicken Horse\BepInEx\plugins\MorePlayersMod" copy "MorePlayersMod.dll" "\\192.168.2.113\Ultimate Chicken Horse\BepInEx\plugins\MorePlayersMod\MorePlayersMod.dll" /y
       copy "MorePlayersMod.dll" "$(UCHfolder)\BepInEx\plugins\MorePlayersMod\MorePlayersMod.dll" /y
-      
+  </PostBuildEvent>
+    <PostBuildEvent Condition="'$(RestartGameOnBuild)' == 'true'">$(PostBuildEvent)
       start explorer.exe "steam://rungameid/386940"
   </PostBuildEvent>
   </PropertyGroup>
 
   <PropertyGroup>
-    <PreBuildEvent>
+    <PreBuildEvent Condition="'$(RestartGameOnBuild)' == 'true'">
       taskkill /f /fi "imagename eq UltimateChickenHorse.exe"
     </PreBuildEvent>
   </PropertyGroup>
