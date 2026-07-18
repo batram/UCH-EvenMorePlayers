@@ -1,1237 +1,847 @@
-using BepInEx;
 using HarmonyLib;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Networking;
-using System.Collections.Generic;
 using UnityEngine.UI;
-using System;
-using System.Collections;
-using GameEvent;
 
 namespace MorePlayers
 {
+    /// <summary>
+    /// Spectator couch for ONLINE games. The vanilla treehouse couch is the local
+    /// hotseat feature (two players, one controller, forces PARTY mode) and is
+    /// hidden/inert online. This mod keeps the couch visible online and turns it
+    /// into a spectator seat: a player with a picked character presses Accept at
+    /// the couch to sit out, spectates started games, and presses Accept again to
+    /// rejoin. Local games keep the vanilla hotseat couch untouched.
+    ///
+    /// Sync model (mirrors the game's own relay pattern, see
+    /// notes/UCH_NETWORKING_ANALYSIS.md):
+    ///  - requests go to the server (msg 1010), the server validates and
+    ///    broadcasts the resulting state (msg 1011) via NetworkServer.SendToAll,
+    ///    which includes the host's own local client;
+    ///  - every peer applies the same state change from the broadcast; the
+    ///    requester never applies ahead of it;
+    ///  - all bookkeeping is keyed by LobbyPlayer.networkNumber and resolved via
+    ///    LobbyManager.GetLobbyPlayer / CharacterInstance, which exist on every
+    ///    peer (PlayerManager/Player only exist for local players);
+    ///  - PlayerStatus (COUCH/CHARACTER) is only written on the owning peer —
+    ///    writes on non-owned LobbyPlayers are silent no-ops;
+    ///  - seat visuals are enforced by an idempotent per-frame reconciler in the
+    ///    treehouse (hooked off HotSeat.Update), so late joiners and lobby
+    ///    reloads self-heal from the synced dictionary. Characters are only
+    ///    teleported on their owning peer; position replicates from there.
+    /// </summary>
     [HarmonyPatch]
-    static class SpectatorModPatches
+    static class SpectatorCouch
     {
-        // Static dictionary to track spectator players
-        public static readonly Dictionary<int, bool> spectatorPlayers = new Dictionary<int, bool>();
-        
-        // Cached SpectatorHotSeat instance
-        private static SpectatorHotSeat SpectatorHotSeatInstance;
-        
-        // Spectator status event class (simplified for spectator-specific needs)
-        public class SpectatorStatusEvent : GameEvent.GameEvent
-        {
-            public readonly int PlayerNumber;
-            public readonly bool IsSpectator;
-            
-            public SpectatorStatusEvent(int playerNumber, bool isSpectator)
-            {
-                PlayerNumber = playerNumber;
-                IsSpectator = isSpectator;
-            }
-        }
-        
-        // Static dictionary to track recent spectators (to prevent cursor creation)
-        private static readonly Dictionary<int, float> recentSpectators = new Dictionary<int, float>();
-        
-        
-        // Reset couch customization when lobby is destroyed
-        [HarmonyPatch(typeof(LobbyManager), nameof(LobbyManager.OnDestroy))]
-        static class LobbyManagerOnDestroyPatch
-        {
-            static void Prefix()
-            {
-                if (!MorePlayersMod.spectatorMode.Value)
-                    return;
+        // Temporary allocation. Keep clear of late-join's 1001-1006 range.
+        // See glorpy_knowledge/network-message-id-coordination-todo.md.
+        private const short RequestMsgType = 1010; // client -> server
+        private const short StateMsgType = 1011;   // server -> all clients
+        private const int OnlineSpectatorSeatCount = 8;
 
-                Debug.Log("[SpectatorMod] Lobby destroyed - preserving SpectatorHotSeatInstance for next session");
-                // Don't destroy SpectatorHotSeatInstance - we want to preserve it across lobby transitions
-                // SpectatorHotSeatInstance will persist and be reused when returning to treehouse
-            }
-        }
-        
-        // Static flag to prevent rapid re-entry (within 1 second)
-        private static readonly Dictionary<int, float> lastSpectatorExit = new Dictionary<int, float>();
+        // networkNumber -> is spectator. The single source of truth on each peer,
+        // written only by ApplyState (from server broadcasts) and cleanup paths.
+        private static readonly Dictionary<int, bool> spectators = new Dictionary<int, bool>();
+        private static bool configurationBoundaryInitialized;
 
-        // Helper method to check if player is spectator
-        public static bool IsSpectator(int networkPlayerNumber)
+        public static void InitializeConfigurationBoundary()
         {
-            return spectatorPlayers.ContainsKey(networkPlayerNumber) && spectatorPlayers[networkPlayerNumber];
-        }
-
-        // Helper method to check if player was recently a spectator (within last 3 seconds)
-        private static bool IsRecentSpectator(int networkPlayerNumber)
-        {
-            if (!recentSpectators.ContainsKey(networkPlayerNumber))
-                return false;
-            
-            float timeSinceExit = Time.time - recentSpectators[networkPlayerNumber];
-            return timeSinceExit < 3f; // 3 seconds
-        }
-
-        // Helper method to check if player recently exited spectator mode (within 1 second)
-        private static bool RecentlyExitedSpectator(int networkPlayerNumber)
-        {
-            if (!lastSpectatorExit.ContainsKey(networkPlayerNumber))
-                return false;
-            
-            float timeSinceExit = Time.time - lastSpectatorExit[networkPlayerNumber];
-            return timeSinceExit < 1f; // 1 second
-        }
-
-        // Helper method to call spectator status command (added via Harmony)
-        private static void CallCmdSetSpectatorStatus(LobbyPlayer lobbyPlayer, bool isSpectator)
-        {
-            try
-            {
-                // This will be patched into LobbyPlayer via Harmony
-                // For now, we'll use a direct approach similar to existing commands
-                if (NetworkServer.active)
-                {
-                    // Server-side: directly set the status and broadcast
-                    SetSpectator(lobbyPlayer.networkNumber, isSpectator);
-                }
-                else if (NetworkClient.active)
-                {
-                    // Client-side: send request to server using existing network infrastructure
-                    // We'll use the PlayerStatus system which is already network-synced
-                    lobbyPlayer.PlayerStatus = isSpectator ? LobbyPlayer.Status.COUCH : LobbyPlayer.Status.CHARACTER;
-                    Debug.Log($"[SpectatorMod] Set spectator status via PlayerStatus for player {lobbyPlayer.networkNumber}");
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError($"[SpectatorMod] Exception in CallCmdSetSpectatorStatus: {ex.Message}");
-            }
-        }
-
-        // Helper method to request spectator sitdown from server (using our custom network system)
-        private static void RequestSpectatorSitdown(int playerNumber)
-        {
-            try
-            {
-                if (LobbyManager.instance != null && NetworkClient.active)
-                {
-                    Debug.Log($"[SpectatorMod] Client requesting spectator sitdown for player {playerNumber} (NetworkClient.active: {NetworkClient.active}, NetworkServer.active: {NetworkServer.active})");
-                    
-                    // Create and send spectator status message to server
-                    SpectatorStatusMessage msg = new SpectatorStatusMessage
-                    {
-                        networkPlayerNumber = playerNumber,
-                        isSpectator = true
-                    };
-                    
-                    NetworkClient.allClients[0].Send(SPECTATOR_STATUS_MSG_TYPE, msg);
-                    Debug.Log($"[SpectatorMod] Sent spectator sitdown request for player {playerNumber}");
-                }
-                else
-                {
-                    Debug.LogWarning($"[SpectatorMod] Cannot request spectator sitdown - no active network connection");
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError($"[SpectatorMod] Exception requesting spectator sitdown: {ex.Message}");
-            }
-        }
-
-        // Helper method to request spectator unsit from server (using our custom network system)
-        private static void RequestSpectatorUnsit(int playerNumber)
-        {
-            try
-            {
-                if (LobbyManager.instance != null && NetworkClient.active)
-                {
-                    Debug.Log($"[SpectatorMod] Client requesting spectator unsit for player {playerNumber}");
-                    
-                    // Create and send spectator status message to server
-                    SpectatorStatusMessage msg = new SpectatorStatusMessage
-                    {
-                        networkPlayerNumber = playerNumber,
-                        isSpectator = false
-                    };
-                    
-                    NetworkClient.allClients[0].Send(SPECTATOR_STATUS_MSG_TYPE, msg);
-                    Debug.Log($"[SpectatorMod] Sent spectator unsit request for player {playerNumber}");
-                }
-                else
-                {
-                    Debug.LogWarning($"[SpectatorMod] Cannot request spectator unsit - no active network connection");
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError($"[SpectatorMod] Exception requesting spectator unsit: {ex.Message}");
-            }
-        }
-
-        // Helper method to set spectator status
-        private static void SetSpectator(int networkPlayerNumber, bool isSpectator)
-        {
-            spectatorPlayers[networkPlayerNumber] = isSpectator;
-            Debug.Log($"[SpectatorMod] Player {networkPlayerNumber} spectator status set to: {isSpectator}");
-            
-            // For local games, handle directly without network messages
-            if (!LobbyManager.instance.IsInOnlineGame)
-            {
-                Debug.Log($"[SpectatorMod] Local game - handling spectator change directly");
-                HandleLocalSpectatorChange(networkPlayerNumber, isSpectator);
-            }
-            else
-            {
-                // Network sync for online games
-                if (NetworkServer.active)
-                {
-                    SendSpectatorStatusUpdate(networkPlayerNumber, isSpectator);
-                }
-                else if (NetworkClient.active)
-                {
-                    // If we're a client, request server sync
-                    if (isSpectator)
-                    {
-                        // Client becoming spectator - request sitdown from server
-                        RequestSpectatorSitdown(networkPlayerNumber);
-                    }
-                    else
-                    {
-                        // Client leaving spectator mode - request unsit from server
-                        RequestSpectatorUnsit(networkPlayerNumber);
-                    }
-                }
-            }
-            
-            // Track when spectator exits
-            if (!isSpectator)
-            {
-                recentSpectators[networkPlayerNumber] = Time.time;
-                lastSpectatorExit[networkPlayerNumber] = Time.time;
-                Debug.Log($"[SpectatorMod] Player {networkPlayerNumber} marked as recent spectator at {Time.time}");
-            }
-        }
-
-        // Handle spectator changes directly in local games (no network)
-        private static void HandleLocalSpectatorChange(int networkPlayerNumber, bool isSpectator)
-        {
-            var levelSelectController = LevelSelectController.lastInstance;
-            if (levelSelectController == null || SpectatorHotSeatInstance == null)
+            if (configurationBoundaryInitialized || MorePlayersMod.spectatorMode == null)
                 return;
 
-            // Find the lobby player
-            LobbyPlayer lobbyPlayer = levelSelectController.FindLobbyPlayer(networkPlayerNumber);
-            if (lobbyPlayer == null) return;
+            configurationBoundaryInitialized = true;
+            MorePlayersMod.spectatorMode.SettingChanged += OnSpectatorModeSettingChanged;
+        }
 
-            // Get the player
-            Player player = PlayerManager.GetInstance().GetPlayer(lobbyPlayer.localNumber);
-            if (player == null) return;
+        private static void OnSpectatorModeSettingChanged(object sender, System.EventArgs args)
+        {
+            if (!MorePlayersMod.spectatorMode.Value)
+                ClearSpectatorState("spectator mode disabled");
+        }
 
-            if (isSpectator)
+        public static bool IsSpectator(int networkNumber)
+        {
+            return spectators.TryGetValue(networkNumber, out bool spec) && spec;
+        }
+
+        public static int SpectatorCount
+        {
+            get
             {
-                Debug.Log($"[SpectatorMod] Local: Sitting player {networkPlayerNumber} on couch");
-                SpectatorHotSeatInstance.SitPlayer(player);
-            }
-            else
-            {
-                Debug.Log($"[SpectatorMod] Local: Unsitting player {networkPlayerNumber} from couch");
-                SpectatorHotSeatInstance.UnsitPlayer(player);
+                int count = 0;
+                foreach (var kvp in spectators)
+                {
+                    if (kvp.Value) count++;
+                }
+                return count;
             }
         }
 
-        // Show couch in online mode for spectator functionality
-        [HarmonyPatch(typeof(HotSeat), nameof(HotSeat.Update))]
-        static class HotSeatUpdatePatch
+        // Only ever active in online games; local play keeps the vanilla couch.
+        private static bool Active
         {
-            static bool Prefix(HotSeat __instance)
+            get
             {
-                if (LobbyManager.instance != null && MorePlayersMod.spectatorMode.Value && SpectatorHotSeatInstance == null)
-                {
-                    // Always show couch, even in online mode
-                    __instance.show();
-                    
-                    Debug.Log("[SpectatorHotSeat] Replacing HotSeat component with SpectatorHotSeat");
-                    SpectatorHotSeatInstance = __instance.gameObject.AddComponent<SpectatorHotSeat>();
-                    
-                    // Copy seat positions from original component
-                    SpectatorHotSeatInstance.SeatPositions = __instance.SeatPositions;
-                    
-                    // Apply styling to the new component
-                    SpectatorHotSeatInstance.ApplySpectatorCouchStyling();
-                    
-                    UnityEngine.Object.Destroy(__instance.GetComponent<HotSeat>());
-
-                    
-                    return false; // Skip original method
-                }
-                return true; // Continue with original method if spectator mode is disabled
+                return MorePlayersMod.spectatorMode.Value
+                    && LobbyManager.instance != null
+                    && LobbyManager.instance.IsInOnlineGame;
             }
         }
 
-        // Helper method to find lobby player for character
-        private static LobbyPlayer FindLobbyPlayerForCharacter(Character character)
+        public class SpectatorMessage : MessageBase
         {
-            if (LevelSelectController.lastInstance != null)
-            {
-                foreach (LobbyPlayer lobbyPlayer in LevelSelectController.lastInstance.JoinedPlayers)
-                {
-                    if (lobbyPlayer != null && lobbyPlayer.CharacterInstance == character)
-                    {
-                        return lobbyPlayer;
-                    }
-                }
-            }
-            return null;
-        }
-
-        // Hook the original couch sitdown logic to handle spectator mode
-        [HarmonyPatch(typeof(LevelSelectController), "ReceiveEvent")]
-        static class LevelSelectControllerReceiveEventPatch
-        {
-            static bool Prefix(LevelSelectController __instance, InputEvent e)
-            {
-                if (!MorePlayersMod.spectatorMode.Value)
-                    return true;
-
-                int controlMask = e.Sender.GetControlMask();
-                
-                LobbyPlayer localPlayer = FindLocalPlayerForInput(e.Sender, controlMask);
-
-                
-                // Handle spectator entry (Accept button)
-                if ((!e.Sender.IsKeyboard || !Controller.InputFieldWasActiveRecently) && e.Key == InputEvent.InputKey.Accept && e.Valueb && e.Changed)
-                {
-                    // Find the LOCAL player that triggered this input
-                    if (localPlayer != null && localPlayer.PlayerStatus == LobbyPlayer.Status.CHARACTER)
-                    {
-                        Debug.Log($"[SpectatorMod] Local player {localPlayer.networkNumber} entering spectator mode");
-                        
-                        // Get the actual player character
-                        Player player = PlayerManager.GetInstance().GetPlayer(localPlayer.localNumber);
-                        Character playerCharacter = player?.PlayerCharacter;
-                        
-                        if (SpectatorHotSeatInstance != null && playerCharacter != null && SpectatorHotSeatInstance.CharacterAtCouch(playerCharacter) && 
-                            !playerCharacter.InMenu && !RecentlyExitedSpectator(localPlayer.networkNumber))
-                        {
-                            SpectatorHotSeatInstance.SitPlayer(player);
-                            
-                            // Set spectator status (this handles network sync automatically)
-                            SetSpectator(localPlayer.networkNumber, true);
-                            
-                            return false; // Prevent original method
-                        }
-                    }
-                }
-
-                // Let the original method handle non-spectator logic
-                return true;
-            }
-            
-            // Helper method to find the LOCAL player for input
-            private static LobbyPlayer FindLocalPlayerForInput(InputMethod sender, int controlMask)
-            {
-                if (controlMask == 0) return null;
-                
-                foreach (LobbyPlayer lobbyPlayer in LevelSelectController.lastInstance?.JoinedPlayers)
-                {
-                    if (lobbyPlayer != null && lobbyPlayer.IsLocalPlayer && sender.ControlsPlayer(lobbyPlayer.localNumber))
-                    {
-                        return lobbyPlayer;
-                    }
-                }
-                return null;
-            }
-        }
-
-        // Custom network message system for spectator status
-        private const short SPECTATOR_STATUS_MSG_TYPE = 1000;
-        
-        // Network message class for spectator status updates
-        public class SpectatorStatusMessage : MessageBase
-        {
-            public int networkPlayerNumber;
+            public int networkNumber;
             public bool isSpectator;
 
             public override void Serialize(NetworkWriter writer)
             {
-                writer.Write(networkPlayerNumber);
+                writer.Write(networkNumber);
                 writer.Write(isSpectator);
             }
 
             public override void Deserialize(NetworkReader reader)
             {
-                networkPlayerNumber = reader.ReadInt32();
+                networkNumber = reader.ReadInt32();
                 isSpectator = reader.ReadBoolean();
             }
         }
-        
-        // Helper method to sync spectator status across network
-        private static void SyncSpectatorStatus(int networkPlayerNumber, bool isSpectator)
+
+        // ------------------------------------------------------------------
+        // Requests and state application
+        // ------------------------------------------------------------------
+
+        public static void RequestSetSpectator(int networkNumber, bool isSpectator)
         {
-            Debug.Log($"[SpectatorMod] Syncing spectator status: Player {networkPlayerNumber} = {isSpectator}");
-            
-            // Update local state immediately
-            SetSpectator(networkPlayerNumber, isSpectator);
-            
-            // Try to sync via LobbyPlayer status for networked players
-            try
+            if (!Active)
             {
-                if (LobbyManager.instance != null)
-                {
-                    Debug.Log($"[SpectatorMod] LobbyManager available, attempting network sync for player {networkPlayerNumber}");
-                    
-                    // Find the LobbyPlayer for this network number
-                    foreach (NetworkLobbyPlayer networkLobbyPlayer in LobbyManager.instance.lobbySlots)
-                    {
-                        if (networkLobbyPlayer != null)
-                        {
-                            LobbyPlayer lobbyPlayer = networkLobbyPlayer as LobbyPlayer;
-                            if (lobbyPlayer != null && lobbyPlayer.networkNumber == networkPlayerNumber)
-                            {
-                                Debug.Log($"[SpectatorMod] Found LobbyPlayer for network sync: {lobbyPlayer.playerName} (networkNumber: {lobbyPlayer.networkNumber})");
-                                
-                                // Update the spectator status on the LobbyPlayer object
-                                if (isSpectator)
-                                {
-                                    lobbyPlayer.PlayerStatus = LobbyPlayer.Status.COUCH;
-                                    Debug.Log($"[SpectatorMod] Set network player {networkPlayerNumber} status to COUCH");
-                                }
-                                else
-                                {
-                                    lobbyPlayer.PlayerStatus = LobbyPlayer.Status.CHARACTER;
-                                    Debug.Log($"[SpectatorMod] Set network player {networkPlayerNumber} status to CHARACTER");
-                                }
-                                break;
-                            }
-                        }
-                    }
-                }
-                else
-                {
-                    Debug.LogWarning("[SpectatorMod] LobbyManager.instance is null, cannot sync network spectator status");
-                }
+                Debug.LogWarning($"[SpectatorMod] ignored spectator request outside active online lobby "
+                    + $"net={networkNumber} spec={isSpectator}");
+                return;
             }
-            catch (Exception ex)
+
+            if (NetworkServer.active)
             {
-                Debug.LogError($"[SpectatorMod] Exception during network sync: {ex.Message}");
+                ServerDecide(networkNumber, isSpectator);
             }
-        }
-        
-        // Send spectator status update to all clients (using our custom network system)
-        private static void SendSpectatorStatusUpdate(int networkPlayerNumber, bool isSpectator)
-        {
-            try
+            else if (LobbyManager.instance != null && LobbyManager.instance.client != null)
             {
-                var msg = new SpectatorStatusMessage
-                {
-                    networkPlayerNumber = networkPlayerNumber,
-                    isSpectator = isSpectator
-                };
-                
-                // Send to all clients
-                NetworkServer.SendToAll(SPECTATOR_STATUS_MSG_TYPE, msg);
-                Debug.Log($"[SpectatorMod] Broadcast spectator status: Player {networkPlayerNumber} = {isSpectator}");
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError($"[SpectatorMod] Failed to send spectator status update: {ex.Message}");
-            }
-        }
-        
-        // Hook into LobbyManager initialization for spectator setup
-        [HarmonyPatch(typeof(LobbyManager), "OnStartClient")]
-        static class LobbyManagerOnStartClientPatch
-        {
-            static void Postfix(LobbyManager __instance, NetworkClient lobbyClient)
-            {
-                if (!MorePlayersMod.spectatorMode.Value)
-                    return;
-                    
-                try
-                {
-                    Debug.Log("[SpectatorMod] LobbyManager OnStartClient - registering network handlers");
-                    
-                    // Register custom message handler for spectator status updates
-                    if (NetworkServer.active)
-                    {
-                        NetworkServer.RegisterHandler(SPECTATOR_STATUS_MSG_TYPE, HandleSpectatorStatusMessage);
-                        Debug.Log("[SpectatorMod] Registered spectator status message handler on server");
-                    }
-                    
-                    if (__instance.client != null)
-                    {
-                        __instance.client.RegisterHandler(SPECTATOR_STATUS_MSG_TYPE, HandleSpectatorStatusMessage);
-                        Debug.Log("[SpectatorMod] Registered spectator status message handler on client");
-                    }
-                    
-                    Debug.Log("[SpectatorMod] Spectator network system ready");
-                }
-                catch (Exception ex)
-                {
-                    Debug.LogError($"[SpectatorMod] Failed to setup spectator network system: {ex.Message}");
-                }
-            }
-        }
-        
-        // Handle spectator status messages (robust network processing)
-        private static void HandleSpectatorStatusMessage(NetworkMessage netMsg)
-        {
-            try
-            {
-                var msg = netMsg.ReadMessage<SpectatorStatusMessage>();
-                Debug.Log($"[SpectatorMod] Network message received: Player {msg.networkPlayerNumber} = {msg.isSpectator}, Connection: {netMsg.conn?.address}, IsServer: {NetworkServer.active}");
-                
-                if (NetworkServer.active)
-                {
-                    // Server-side: Process client requests (don't rebroadcast to avoid loop)
-                    if (netMsg.conn != null && netMsg.conn.address != "localServer")
-                    {
-                        Debug.Log($"[SpectatorMod] Server: Received spectator request - Player {msg.networkPlayerNumber} = {msg.isSpectator}");
-                        
-                        // Update server state only (no broadcast to avoid infinite loop)
-                        spectatorPlayers[msg.networkPlayerNumber] = msg.isSpectator;
-                        
-                        // Server handles sit/unsit logic directly
-                        var levelSelectController = LevelSelectController.lastInstance;
-                        if (levelSelectController != null)
-                        {
-                            HandleServerSpectatorUpdate(levelSelectController, msg.networkPlayerNumber, msg.isSpectator);
-                        }
-                    }
-                }
-                else
-                {
-                    // Client-side: Apply spectator status from server
-                    Debug.Log($"[SpectatorMod] Client: Received spectator status - Player {msg.networkPlayerNumber} = {msg.isSpectator}");
-                    
-                    // Update local state directly (no recursive calls)
-                    spectatorPlayers[msg.networkPlayerNumber] = msg.isSpectator;
-                    Debug.Log($"[SpectatorMod] Client: Updated player {msg.networkPlayerNumber} spectator status to {msg.isSpectator}");
-                    
-                    // Clients do NOT execute sit/unsit logic - only server handles this
-                    // This prevents multiple clients from trying to unsit the same player
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError($"[SpectatorMod] Error handling spectator status message: {ex.Message}");
-            }
-        }
-                
-        // Handle spectator updates on server (sit/unsit from couch)
-        private static void HandleServerSpectatorUpdate(LevelSelectController controller, int networkPlayerNumber, bool isSpectator)
-        {
-            try
-            {
-                Debug.Log($"[SpectatorMod] Server handling spectator update: Player {networkPlayerNumber} = {isSpectator}");
-                
-                // get player by network number
-                LobbyPlayer targetLobbyPlayer = controller.FindLobbyPlayer(networkPlayerNumber);
-                                
-                // Only proceed if we found the correct lobby player
-                if (targetLobbyPlayer != null)
-                {
-                    // Get the actual player from the lobby player (use localNumber for PlayerManager lookup)
-                    Player player = PlayerManager.GetInstance().GetPlayer(targetLobbyPlayer.localNumber);
-                    
-                    if (player != null)
-                    {
-                        // Additional check: only apply spectator changes if this player is actually meant to be a spectator
-                        bool shouldBeSpectator = IsSpectator(networkPlayerNumber);
-                        
-                        if (shouldBeSpectator == isSpectator)
-                        {
-                            if (isSpectator)
-                            {
-                                // Sit player on couch
-                                Debug.Log($"[SpectatorMod] Server sitting player {networkPlayerNumber} on couch (confirmed spectator)");
-                                SpectatorHotSeatInstance.SitPlayer(player);
-                            }
-                            else
-                            {
-                                // Unsit player from couch only if they're actually seated
-                                if (SpectatorHotSeatInstance != null && SpectatorHotSeatInstance.PlayerSitting(player))
-                                {
-                                    Debug.Log($"[SpectatorMod] Server unsitting player {networkPlayerNumber} from couch (confirmed non-spectator)");
-                                    SpectatorHotSeatInstance.UnsitPlayer(player);
-                                }
-                                else
-                                {
-                                    Debug.Log($"[SpectatorMod] Server skipping unsit for player {networkPlayerNumber} - not seated on couch");
-                                }
-                            }
-                        }
-                        else
-                        {
-                            Debug.LogWarning($"[SpectatorMod] Skipping couch operation for player {networkPlayerNumber} - spectator status mismatch: expected {shouldBeSpectator}, got {isSpectator}");
-                        }
-                    }
-                    else
-                    {
-                        Debug.LogWarning($"[SpectatorMod] Could not find LocalPlayer for lobby player {networkPlayerNumber}");
-                    }
-                }
-                else
-                {
-                    Debug.LogWarning($"[SpectatorMod] Could not find lobby player {networkPlayerNumber} for couch operations");
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError($"[SpectatorMod] Error in HandleClientSpectatorUpdate: {ex.Message}");
+                var msg = new SpectatorMessage { networkNumber = networkNumber, isSpectator = isSpectator };
+                LobbyManager.instance.client.Send(RequestMsgType, msg);
+                Debug.Log($"[SpectatorMod] sent request net={networkNumber} spec={isSpectator}");
             }
         }
 
-        // Handle player disconnect to clean up spectator status
-        [HarmonyPatch(typeof(LobbyManager), "OnClientDisconnect")]
-        static class LobbyManagerOnClientDisconnectPatch
+        // Server-side: validate a sit/unsit request and broadcast the result to
+        // every peer (SendToAll reaches the host's local client too, so the host
+        // applies through the same path as everyone else).
+        private static void ServerDecide(int networkNumber, bool isSpectator)
+        {
+            LobbyPlayer lobbyPlayer = LobbyManager.instance?.GetLobbyPlayer(networkNumber);
+            if (lobbyPlayer == null)
+            {
+                // Unsit for an already-gone player is still broadcast so stale
+                // entries clear everywhere (e.g. disconnect cleanup).
+                if (isSpectator)
+                {
+                    Debug.LogWarning($"[SpectatorMod] server denied sit: no lobby player {networkNumber}");
+                    return;
+                }
+            }
+
+            if (isSpectator)
+            {
+                if (IsSpectator(networkNumber))
+                    return; // already seated, idempotent
+                if (lobbyPlayer.PlayerStatus != LobbyPlayer.Status.CHARACTER)
+                {
+                    Debug.LogWarning($"[SpectatorMod] server denied sit for {networkNumber}: status={lobbyPlayer.PlayerStatus}");
+                    return;
+                }
+                HotSeat couch = LevelSelectController.lastInstance != null
+                    ? LevelSelectController.lastInstance.HotSeatCouch
+                    : null;
+                if (couch == null)
+                {
+                    couch = Object.FindObjectOfType<HotSeat>();
+                }
+                EnsureExpandedSeats(couch);
+                int seatCount = couch != null && couch.seats != null
+                    ? couch.seats.Length
+                    : 0;
+                if (seatCount == 0 || SpectatorCount >= seatCount)
+                {
+                    Debug.LogWarning($"[SpectatorMod] server denied sit for {networkNumber}: no free seat "
+                        + $"(lastInstance={(LevelSelectController.lastInstance != null)}, couch={(couch != null)}, "
+                        + $"seats={seatCount}, spectators={SpectatorCount})");
+                    return;
+                }
+            }
+            else if (!IsSpectator(networkNumber))
+            {
+                return; // not a spectator, nothing to do
+            }
+
+            var msg = new SpectatorMessage { networkNumber = networkNumber, isSpectator = isSpectator };
+            NetworkServer.SendToAll(StateMsgType, msg);
+        }
+
+        private static void OnServerRequest(NetworkMessage netMsg)
+        {
+            var msg = netMsg.ReadMessage<SpectatorMessage>();
+            Debug.Log($"[SpectatorMod] server got request net={msg.networkNumber} spec={msg.isSpectator}");
+            ServerDecide(msg.networkNumber, msg.isSpectator);
+        }
+
+        private static void OnClientState(NetworkMessage netMsg)
+        {
+            var msg = netMsg.ReadMessage<SpectatorMessage>();
+            ApplyState(msg.networkNumber, msg.isSpectator);
+        }
+
+        // Runs identically on every peer. Updates the dictionary, transitions the
+        // lobby status on the owning peer, and lets the reconciler do the seat
+        // visuals on its next tick.
+        private static void ApplyState(int networkNumber, bool isSpectator)
+        {
+            if (!Active)
+            {
+                Debug.LogWarning($"[SpectatorMod] ignored spectator state outside active online lobby "
+                    + $"net={networkNumber} spec={isSpectator}");
+                return;
+            }
+
+            spectators[networkNumber] = isSpectator;
+            Debug.Log($"[SpectatorMod] STATE net={networkNumber} spec={isSpectator} "
+                + $"peer={(NetworkServer.active ? "host" : "client")}");
+
+            LobbyPlayer lobbyPlayer = LobbyManager.instance?.GetLobbyPlayer(networkNumber);
+            if (lobbyPlayer != null && lobbyPlayer.IsLocalPlayer)
+            {
+                if (isSpectator && lobbyPlayer.PlayerStatus == LobbyPlayer.Status.CHARACTER)
+                {
+                    lobbyPlayer.PlayerStatus = LobbyPlayer.Status.COUCH;
+                }
+                else if (!isSpectator && lobbyPlayer.PlayerStatus == LobbyPlayer.Status.COUCH)
+                {
+                    lobbyPlayer.PlayerStatus = LobbyPlayer.Status.CHARACTER;
+                }
+            }
+        }
+
+        // ------------------------------------------------------------------
+        // Network plumbing patches
+        // ------------------------------------------------------------------
+
+        [HarmonyPatch(typeof(LobbyManager), nameof(LobbyManager.OnStartClient))]
+        static class RegisterHandlersPatch
+        {
+            static void Postfix(NetworkClient lobbyClient)
+            {
+                if (!MorePlayersMod.spectatorMode.Value)
+                    return;
+
+                if (NetworkServer.active)
+                {
+                    NetworkServer.RegisterHandler(RequestMsgType, OnServerRequest);
+                }
+                if (lobbyClient != null)
+                {
+                    lobbyClient.RegisterHandler(StateMsgType, OnClientState);
+                }
+                Debug.Log("[SpectatorMod] network handlers registered "
+                    + $"(server={NetworkServer.active})");
+            }
+        }
+
+        // Bring late joiners up to date with the current spectator set.
+        [HarmonyPatch(typeof(LobbyManager), "OnLobbyServerConnect")]
+        static class LateJoinSyncPatch
         {
             static void Postfix(NetworkConnection conn)
             {
-                if (!MorePlayersMod.spectatorMode.Value)
-                    return;
-                    
-                try
-                {
-                    // Find the player that disconnected and clean up their spectator status
-                    foreach (NetworkLobbyPlayer networkLobbyPlayer in LobbyManager.instance.lobbySlots)
-                    {
-                        if (networkLobbyPlayer != null && networkLobbyPlayer.connectionToClient == conn)
-                        {
-                            LobbyPlayer lobbyPlayer = networkLobbyPlayer as LobbyPlayer;
-                            if (lobbyPlayer != null)
-                            {
-                                Debug.Log($"[SpectatorMod] Player {lobbyPlayer.networkNumber} disconnected, cleaning up spectator status");
-                                
-                                // Remove spectator status for disconnected player
-                                if (spectatorPlayers.ContainsKey(lobbyPlayer.networkNumber))
-                                {
-                                    spectatorPlayers.Remove(lobbyPlayer.networkNumber);
-                                }
-                                
-                                // Notify other clients about the status change
-                                if (NetworkServer.active)
-                                {
-                                    SendSpectatorStatusUpdate(lobbyPlayer.networkNumber, false);
-                                }
-                                break;
-                            }
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Debug.LogError($"[SpectatorMod] Error handling player disconnect: {ex.Message}");
-                }
-            }
-        }
-        // Sync all spectator status to newly connected clients (using our message system)
-        [HarmonyPatch(typeof(LobbyManager), "OnLobbyServerConnect")]
-        static class LobbyManagerOnLobbyServerConnectPatch
-        {
-            static void Postfix(LobbyManager __instance, NetworkConnection conn)
-            {
                 if (!MorePlayersMod.spectatorMode.Value || !NetworkServer.active)
                     return;
-                    
-                // Only sync if there are actually spectators to avoid unnecessary traffic
-                bool hasSpectators = false;
-                foreach (var kvp in spectatorPlayers)
+
+                foreach (var kvp in spectators)
                 {
                     if (kvp.Value)
                     {
-                        hasSpectators = true;
-                        break;
-                    }
-                }
-                
-                if (!hasSpectators)
-                    return; // No spectators, no need to sync
-                    
-                try
-                {
-                    Debug.Log($"[SpectatorMod] Syncing existing spectator status to new client");
-                    
-                    // Send current spectator status for all spectators to the new client
-                    foreach (var kvp in spectatorPlayers)
-                    {
-                        if (kvp.Value) // Only send for spectators
+                        conn.Send(StateMsgType, new SpectatorMessage
                         {
-                            var msg = new SpectatorStatusMessage
-                            {
-                                networkPlayerNumber = kvp.Key,
-                                isSpectator = true
-                            };
-                            
-                            // Send only to the new client (not all clients)
-                            conn.Send(SPECTATOR_STATUS_MSG_TYPE, msg);
-                            Debug.Log($"[SpectatorMod] Synced spectator status for player {kvp.Key} to new client");
-                        }
+                            networkNumber = kvp.Key,
+                            isSpectator = true
+                        });
                     }
-                }
-                catch (Exception ex)
-                {
-                    Debug.LogError($"[SpectatorMod] Error syncing spectator status to new client: {ex.Message}");
                 }
             }
         }
 
-        // Block UnpickCharacter for recent spectators to prevent cursor creation
-        [HarmonyPatch(typeof(LobbyPlayer), nameof(LobbyPlayer.UnpickCharacter))]
-        static class LobbyPlayerUnpickCharacterPatch
-        {
-            static bool Prefix(LobbyPlayer __instance)
-            {
-                if (!MorePlayersMod.spectatorMode.Value)
-                    return true; // Continue normally if spectator mode is disabled
-
-                // Block UnpickCharacter if this player was recently a spectator (within last 3 seconds) or is currently a spectator
-                if (IsRecentSpectator(__instance.networkNumber) || IsSpectator(__instance.networkNumber))
-                {
-                    Debug.Log($"[SpectatorMod] Blocked UnpickCharacter for recent spectator player {__instance.networkNumber}");
-                    return false; // Block UnpickCharacter to prevent cursor creation
-                }
-                return true; // Continue normally
-            }
-        }
-
-        // Single patch to filter PlayerQueue once after SetupStart completes
-        [HarmonyPatch(typeof(GameControl), nameof(GameControl.SetupStart))]
-        static class GameControlSetupStartPostfixPatch
-        {
-            static void Postfix(GameControl __instance, GameState.GameMode mode)
-            {
-                if (!MorePlayersMod.spectatorMode.Value)
-                    return;
-
-                try
-                {
-                    int originalCount = __instance.PlayerQueue.Count;
-                    if (originalCount == 0)
-                        return;
-
-                    // Filter spectators out of PlayerQueue once
-                    Queue<GamePlayer> filteredQueue = new Queue<GamePlayer>();
-                    GamePlayer[] players = __instance.PlayerQueue.ToArray();
-
-                    foreach (GamePlayer player in players)
-                    {
-                        if (!IsSpectator(player.networkNumber))
-                        {
-                            filteredQueue.Enqueue(player);
-                        }
-                        else
-                        {
-                            Debug.Log($"[SpectatorMod] Filtered spectator {player.networkNumber} from PlayerQueue");
-                        }
-                    }
-
-                    // Replace queue with filtered version
-                    __instance.PlayerQueue = filteredQueue;
-                    Debug.Log($"[SpectatorMod] Filtered PlayerQueue: {originalCount} -> {filteredQueue.Count} players");
-
-                }
-                catch (System.Exception ex)
-                {
-                    Debug.LogError($"[SpectatorMod] Error filtering PlayerQueue: {ex.Message}");
-                }
-            }
-        }
-
-        // Patch to setup spectator cursors when game starts
-        [HarmonyPatch(typeof(VersusControl), nameof(VersusControl.SetupStart))]
-        static class VersusControlSetupStartPatch
-        {
-            static void Postfix(VersusControl __instance, GameState.GameMode mode)
-            {
-                if (!MorePlayersMod.spectatorMode.Value)
-                    return;
-
-                try
-                {
-                    if (__instance.invBookInstance?.pickCursorPrefab == null)
-                    {
-                        Debug.LogWarning("[SpectatorMod] InventoryBook or cursor prefab not found");
-                        return;
-                    }
-
-                    // Create cursors for all spectators
-                    PlayerManager playerManager = PlayerManager.GetInstance();
-                    if (playerManager == null)
-                        return;
-
-                    foreach (Player player in playerManager)
-                    {
-                        if (player?.AssociatedLobbyPlayer != null && IsSpectator(player.AssociatedLobbyPlayer.networkNumber))
-                        {
-                            CreateSpectatorCursor(player, player.AssociatedLobbyPlayer.networkNumber, __instance.invBookInstance.pickCursorPrefab);
-                        }
-                    }
-                }
-                catch (System.Exception ex)
-                {
-                    Debug.LogError($"[SpectatorMod] Error setting up spectator cursors: {ex.Message}");
-                }
-            }
-        }
-
-
-        // Patch to handle spectator input (exit spectator mode and menu access)
-        [HarmonyPatch(typeof(Controller), nameof(Controller.Notify))]
-        static class ControllerNotifyPatch
-        {
-            static bool Prefix(Controller __instance, InputEvent e)
-            {
-                if (!MorePlayersMod.spectatorMode.Value || !e.Valueb || !e.Changed)
-                    return true;
-
-                // Handle both keyboard (Esc) and controller (Start/Back) buttons
-                if (e.Key != InputEvent.InputKey.Esc && e.Key != InputEvent.InputKey.Start && e.Key != InputEvent.InputKey.Back)
-                    return true; // Not a relevant button, continue normally
-
-                // Use PossibleNetWorkNumber directly for spectator detection
-                int spectatorNetworkNumber = __instance.PossibleNetWorkNumber;
-                if (spectatorNetworkNumber == 0 || !IsSpectator(spectatorNetworkNumber))
-                    return true; // Not a spectator, continue normally
-
-                // Find player by network number
-                Player player = FindPlayerByNetworkNumber(spectatorNetworkNumber);
-                if (player?.PlayerCharacter == null)
-                    return true; // No character found, continue normally
-
-                Character character = player.PlayerCharacter;
-                
-                // Handle spectator exit with Back button in lobby
-                if (e.Key == InputEvent.InputKey.Back && 
-                    UnityEngine.SceneManagement.SceneManager.GetActiveScene().name == "TreeHouseLobby")
-                {
-                    // Exit spectator mode when B is pressed in lobby
-                    Debug.Log($"[SpectatorMod] B button pressed - exiting spectator mode for player {spectatorNetworkNumber}");
-                    
-                    // Find lobby player and exit spectator mode
-                    LobbyPlayer lobbyPlayer = FindLobbyPlayerForCharacter(character);
-                    if (lobbyPlayer != null)
-                    {
-                        SetSpectator(lobbyPlayer.networkNumber, false);
-                    }
-                    
-                    return false; // Prevent further processing
-                }
-                
-                // Handle menu toggle during gameplay (Esc/Start)
-                if (UnityEngine.SceneManagement.SceneManager.GetActiveScene().name != "TreeHouseLobby")
-                {
-                    // Toggle menu state (cursor already exists)
-                    if (!character.InMenu)
-                    {
-                        character.InMenu = true;
-                        character.Freeze(false, false, false);
-                        GameEventManager.SendEvent(new PlayerInventoryEvent(true, spectatorNetworkNumber, false));
-                        GameEventManager.SendEvent(new SoftPauseEvent(true, spectatorNetworkNumber, NetworkServer.active));
-                    }
-                    else
-                    {
-                        character.InMenu = false;
-                        character.Unfreeze();
-                        GameEventManager.SendEvent(new PlayerInventoryEvent(false, spectatorNetworkNumber, false));
-                        GameEventManager.SendEvent(new SoftPauseEvent(false, spectatorNetworkNumber, NetworkServer.active));
-                    }
-                }
-
-                return false; // Prevent normal menu handling
-            }
-        }
-
-        // Helper method to find player by network number
-        private static Player FindPlayerByNetworkNumber(int networkNumber)
-        {
-            PlayerManager playerManager = PlayerManager.GetInstance();
-            if (playerManager == null)
-                return null;
-
-            foreach (Player player in playerManager)
-            {
-                if (player?.AssociatedLobbyPlayer?.networkNumber == networkNumber)
-                    return player;
-            }
-
-            return null;
-        }
-
-        // Dictionary to track temporary spectator cursors
-        private static readonly Dictionary<int, PickCursor> spectatorCursors = new Dictionary<int, PickCursor>();
-
-        // Create a temporary cursor for spectator menu navigation
-        private static void CreateSpectatorCursor(Player player, int networkNumber, PickCursor cursorPrefab)
-        {
-            if (spectatorCursors.ContainsKey(networkNumber))
-                return; // Cursor already exists
-
-            try
-            {
-                // Create cursor at spectator's position
-                Vector3 cursorPosition = player.PlayerCharacter != null ? player.PlayerCharacter.transform.position : Vector3.zero;
-                PickCursor cursor = UnityEngine.Object.Instantiate(cursorPrefab, cursorPosition, Quaternion.identity);
-                
-                // Setup cursor properties
-                cursor.NetworknetworkNumber = networkNumber;
-                cursor.NetworklocalNumber = player.Number;
-                cursor.CursorColor = Color.white; // Default color for spectators
-                cursor.AssociatedGamePlayer = null; // No GamePlayer for spectators
-                
-                // Add cursor to inventory book
-                VersusControl versusControl = UnityEngine.Object.FindObjectOfType<VersusControl>();
-                if (versusControl?.invBookInstance != null)
-                {
-                    versusControl.invBookInstance.AddPlayer(player.Number, networkNumber, player.UseController, Character.Animals.NONE);
-                }
-                
-                // Enable cursor and make it visible
-                cursor.Enable();
-                cursor.SetLocalController(player.UseController);
-                
-                spectatorCursors[networkNumber] = cursor;
-                Debug.Log($"[SpectatorMod] Created and enabled persistent cursor for spectator {networkNumber}");
-            }
-            catch (System.Exception ex)
-            {
-                Debug.LogError($"[SpectatorMod] Error creating spectator cursor: {ex.Message}");
-            }
-        }
-
-        // Cleanup all spectator cursors
-        private static void CleanupAllSpectatorCursors()
-        {
-            foreach (var kvp in spectatorCursors)
-            {
-                try
-                {
-                    PickCursor cursor = kvp.Value;
-                    if (cursor != null)
-                    {
-                        cursor.Disable();
-                        UnityEngine.Object.Destroy(cursor.gameObject);
-                    }
-                }
-                catch (System.Exception ex)
-                {
-                    Debug.LogError($"[SpectatorMod] Error cleaning up spectator cursor {kvp.Key}: {ex.Message}");
-                }
-            }
-            
-            spectatorCursors.Clear();
-            Debug.Log("[SpectatorMod] Cleaned up all spectator cursors");
-        }
-
-
-        // Prevent spectator cursors from picking items (but allow menu interactions)
-        [HarmonyPatch(typeof(PickCursor), nameof(PickCursor.OnAccept))]
-        static class PickCursorOnAcceptPatch
-        {
-            static bool Prefix(PickCursor __instance)
-            {
-                if (!MorePlayersMod.spectatorMode.Value)
-                    return true; // Continue normally if spectator mode is disabled
-
-                // Check if this cursor belongs to a spectator
-                if (__instance.networkNumber != 0 && IsSpectator(__instance.networkNumber))
-                {
-                    // Allow menu interactions but block item picking
-                    if (__instance.lastHoveredPick is PickableBlock)
-                    {
-                        Debug.Log($"[SpectatorMod] Blocked item picking for spectator cursor {__instance.networkNumber}");
-                        return false; // Block picking up blocks/items
-                    }
-                    
-                    // Allow button interactions (menu buttons, etc.)
-                    if (__instance.lastHoveredPick is PickableButton)
-                    {
-                        Debug.Log($"[SpectatorMod] Allowed button interaction for spectator cursor {__instance.networkNumber}");
-                        return true; // Allow button interactions
-                    }
-                }
-
-                return true; // Continue normally for non-spectators
-            }
-        }
-
-        // Prevent spectator cursors from hovering over pickable blocks (but allow buttons)
-        [HarmonyPatch(typeof(PickCursor), nameof(PickCursor.checkHoveredPickAdd))]
-        static class PickCursorCheckHoveredPickAddPatch
-        {
-            static bool Prefix(PickCursor __instance, Collider2D c)
-            {
-                if (!MorePlayersMod.spectatorMode.Value)
-                    return true; // Continue normally if spectator mode is disabled
-
-                // Check if this cursor belongs to a spectator
-                if (__instance.networkNumber != 0 && IsSpectator(__instance.networkNumber))
-                {
-                    // Check what type of pickable this is
-                    IPickable pickable = c.GetComponent(typeof(IPickable)) as IPickable;
-                    if (pickable == null)
-                    {
-                        pickable = c.transform.parent.GetComponent(typeof(IPickable)) as IPickable;
-                    }
-                    
-                    // Block hover detection for blocks but allow buttons
-                    if (pickable is PickableBlock)
-                    {
-                        return false; // Block hovering over blocks
-                    }
-                    
-                    // Allow hovering over buttons for menu navigation
-                    if (pickable is PickableButton)
-                    {
-                        return true; // Allow hovering over buttons
-                    }
-                }
-
-                return true; // Continue normally for non-spectators
-            }
-        }
-
-        // Prevent spectator cursors from dealing with pickable blocks (but allow buttons)
-        [HarmonyPatch(typeof(PickCursor), nameof(PickCursor.dealWithPickable))]
-        static class PickCursorDealWithPickablePatch
-        {
-            static bool Prefix(PickCursor __instance)
-            {
-                if (!MorePlayersMod.spectatorMode.Value)
-                    return true; // Continue normally if spectator mode is disabled
-
-                // Check if this cursor belongs to a spectator
-                if (__instance.networkNumber != 0 && IsSpectator(__instance.networkNumber))
-                {
-                    // Only block if dealing with pickable blocks, not buttons
-                    if (__instance.lastHoveredPick is PickableBlock)
-                    {
-                        Debug.Log($"[SpectatorMod] Blocked dealWithPickable for spectator cursor {__instance.networkNumber}");
-                        return false; // Block the interaction
-                    }
-                    
-                    // Allow button interactions
-                    if (__instance.lastHoveredPick is PickableButton)
-                    {
-                        return true; // Allow button interactions
-                    }
-                }
-
-                return true; // Continue normally for non-spectators
-            }
-        }
-
-        // Preserve spectator state when returning to treehouse after a game
-        [HarmonyPatch(typeof(LevelSelectController), nameof(LevelSelectController.SetupLobbyAfterWait))]
-        static class LevelSelectControllerSetupLobbyAfterWaitPatch
-        {
-            static void Postfix(LevelSelectController __instance)
-            {
-                if (!MorePlayersMod.spectatorMode.Value)
-                    return;
-
-                try
-                {
-                    Debug.Log("[SpectatorMod] SetupLobbyAfterWait - checking for spectator state restoration");
-                    
-                    // Wait a frame to ensure all player setup is complete
-                    __instance.StartCoroutine(RestoreSpectatorStatesDelayed(__instance));
-                }
-                catch (System.Exception ex)
-                {
-                    Debug.LogError($"[SpectatorMod] Error in SetupLobbyAfterWait patch: {ex.Message}");
-                }
-            }
-        }
-
-        // Delayed restoration to ensure all player objects are properly initialized
-        private static IEnumerator RestoreSpectatorStatesDelayed(LevelSelectController controller)
-        {
-            yield return null; // Wait one frame
-            
-            try
-            {
-                Debug.Log("[SpectatorMod] Restoring spectator states after returning to treehouse");
-                
-                // Check if we have any spectators to restore
-                bool hasSpectators = false;
-                foreach (var kvp in spectatorPlayers)
-                {
-                    if (kvp.Value) // isSpectator
-                    {
-                        hasSpectators = true;
-                        break;
-                    }
-                }
-                
-                if (hasSpectators)
-                {
-                    Debug.Log("[SpectatorMod] Spectators detected - ensuring couch is enabled");
-                    
-                    // Ensure UsingHotSeat is enabled for spectators
-                    if (!GameState.GetInstance().UsingHotSeat)
-                    {
-                        GameState.GetInstance().UsingHotSeat = true;
-                        Debug.Log("[SpectatorMod] Enabled UsingHotSeat for spectator restoration");
-                    }
-                    
-                    // Lock party mode button if needed
-                    if (!controller.PartyModeButton.Locked)
-                    {
-                        controller.PartyModeButton.Lock();
-                        Debug.Log("[SpectatorMod] Locked party mode button for spectator restoration");
-                    }
-                    
-                    // SpectatorHotSeatInstance should now be preserved across lobby transitions
-                    // If it's still null here, there might be an issue with the initial creation
-                    if (SpectatorHotSeatInstance == null)
-                    {
-                        Debug.LogWarning("[SpectatorMod] SpectatorHotSeatInstance is null despite preservation - this should not happen");
-                    }
-                    else
-                    {
-                        // Reapply couch styling since we're returning to lobby
-                        Debug.Log("[SpectatorMod] Reapplying spectator couch styling");
-                        SpectatorHotSeatInstance.ApplySpectatorCouchStyling();
-                    }
-                }
-                
-                // Iterate through all players and restore spectator state
-                foreach (LobbyPlayer lobbyPlayer in LobbyManager.instance.lobbySlots)
-                {
-                    if (lobbyPlayer != null && IsSpectator(lobbyPlayer.networkNumber))
-                    {
-                        Debug.Log($"[SpectatorMod] Found spectator {lobbyPlayer.networkNumber}, localNumber: {lobbyPlayer.localNumber}, status: {lobbyPlayer.PlayerStatus}");
-                        
-                        // Get the player character (use localNumber for PlayerManager lookup)
-                        Player player = PlayerManager.GetInstance().GetPlayer(lobbyPlayer.localNumber);
-                        Debug.Log($"[SpectatorMod] Player lookup result: {player?.ToString() ?? "null"}");
-                        
-                        if (player != null)
-                        {
-                            Debug.Log($"[SpectatorMod] PlayerCharacter: {player.PlayerCharacter?.ToString() ?? "null"}");
-                            
-                            if (player.PlayerCharacter != null)
-                            {
-                                Debug.Log($"[SpectatorMod] SpectatorHotSeatInstance: {SpectatorHotSeatInstance?.ToString() ?? "null"}");
-                                
-                                if (SpectatorHotSeatInstance != null)
-                                {
-                                    Debug.Log($"[SpectatorMod] Sitting restored spectator {lobbyPlayer.networkNumber} on couch");
-                                    
-                                    // Update player status to COUCH
-                                    lobbyPlayer.PlayerStatus = LobbyPlayer.Status.COUCH;
-                                    
-                                    // Update the player join indicator
-                                    int playerIndex = lobbyPlayer.networkNumber - 1;
-                                    if (playerIndex >= 0 && playerIndex < controller.PlayerJoinIndicators.Length)
-                                    {
-                                        controller.PlayerJoinIndicators[playerIndex].ReadyEnabled();
-                                    }
-                                    
-                                    // Sit the player on the couch
-                                    SpectatorHotSeatInstance.SitPlayer(player);
-                                    
-                                    // Network sync for spectator restoration
-                                    if (NetworkServer.active)
-                                    {
-                                        // Server: broadcast the spectator restoration to all clients
-                                        SendSpectatorStatusUpdate(lobbyPlayer.networkNumber, true);
-                                        Debug.Log($"[SpectatorMod] Server: Broadcast spectator restoration for player {lobbyPlayer.networkNumber}");
-                                    }
-                                    else if (NetworkClient.active && lobbyPlayer.IsLocalPlayer)
-                                    {
-                                        // Client: request server to validate and sync the spectator restoration
-                                        RequestSpectatorSitdown(lobbyPlayer.networkNumber);
-                                        Debug.Log($"[SpectatorMod] Client: Requested spectator restoration sync for player {lobbyPlayer.networkNumber}");
-                                    }
-                                    
-                                    Debug.Log($"[SpectatorMod] Successfully restored spectator {lobbyPlayer.networkNumber} to couch");
-                                }
-                                else
-                                {
-                                    Debug.LogError($"[SpectatorMod] SpectatorHotSeatInstance is null - cannot seat spectator {lobbyPlayer.networkNumber}");
-                                }
-                            }
-                            else
-                            {
-                                Debug.LogWarning($"[SpectatorMod] PlayerCharacter is null for spectator {lobbyPlayer.networkNumber}");
-                            }
-                        }
-                        else
-                        {
-                            Debug.LogWarning($"[SpectatorMod] Player is null for spectator {lobbyPlayer.networkNumber}");
-                        }
-                    }
-                }
-                
-                Debug.Log("[SpectatorMod] Spectator state restoration completed");
-            }
-            catch (System.Exception ex)
-            {
-                Debug.LogError($"[SpectatorMod] Error during delayed spectator state restoration: {ex.Message}");
-            }
-        }
-
-        // Hook into GameEndEvent to preserve spectator state when game ends
-        [HarmonyPatch(typeof(GameEventManager), "SendEvent")]
-        static class GameEventManagerSendEventPatch
-        {
-            static void Prefix(GameEvent.GameEvent e)
-            {
-                if (!MorePlayersMod.spectatorMode.Value)
-                    return;
-
-                // Check if this is a game end event
-                if (e is GameEvent.GameEndEvent gameEndEvent)
-                {
-                    Debug.Log("[SpectatorMod] GameEndEvent detected - spectator states will be preserved");
-                    // Spectator states are already tracked in the static dictionary, so no action needed here
-                    // The restoration will happen when returning to treehouse
-                }
-            }
-        }
-
-        // Prevent UsingHotSeat from being disabled when spectators are present
+        // A leaving lobby player must not leave a stale spectator entry behind —
+        // network numbers get reused by later joiners.
         [HarmonyPatch(typeof(LevelSelectController), "OnLobbyPlayerObjectDestroyed")]
-        static class OnLobbyPlayerObjectDestroyedPatch
+        static class PlayerLeftCleanupPatch
         {
             static void Postfix(LobbyPlayer lobbyPl)
             {
-                if (!MorePlayersMod.spectatorMode.Value)
+                if (!MorePlayersMod.spectatorMode.Value || lobbyPl == null)
                     return;
 
-                try
+                if (NetworkServer.active && IsSpectator(lobbyPl.networkNumber))
                 {
-                    // Check if there are still spectators after a player leaves
-                    if (SpectatorHotSeatInstance != null && GameState.GetInstance().UsingHotSeat == false)
-                    {
-                        bool hasSpectators = false;
-                        foreach (var kvp in spectatorPlayers)
-                        {
-                            if (kvp.Value) // isSpectator
-                            {
-                                hasSpectators = true;
-                                break;
-                            }
-                        }
+                    Debug.Log($"[SpectatorMod] spectator {lobbyPl.networkNumber} left, clearing");
+                    ServerDecide(lobbyPl.networkNumber, false);
+                }
+            }
+        }
 
-                        if (hasSpectators)
+        [HarmonyPatch(typeof(LobbyManager), nameof(LobbyManager.OnDestroy))]
+        static class LobbyTeardownPatch
+        {
+            static void Prefix()
+            {
+                // LobbyManager is a scene object and is destroyed during the
+                // normal level -> treehouse transition while the UNet session
+                // remains alive.  Clearing here used to erase the spectator
+                // set just before the new treehouse couch could reconcile it.
+                if (!NetworkServer.active && !NetworkClient.active)
+                {
+                    ClearSpectatorState("lobby destroyed after network shutdown");
+                }
+                else if (spectators.Count > 0)
+                {
+                    Debug.Log("[SpectatorMod] lobby scene object destroyed while connected; "
+                        + $"preserving {SpectatorCount} spectator(s)");
+                }
+            }
+        }
+
+        // Explicit session teardown paths. Unlike OnDestroy, these indicate
+        // that the peer really is leaving the network session, so retained
+        // network numbers must not leak into a later lobby.
+        [HarmonyPatch(typeof(LobbyManager), nameof(LobbyManager.Disconnect))]
+        static class DisconnectCleanupPatch
+        {
+            static void Prefix()
+            {
+                ClearSpectatorState("disconnect");
+            }
+        }
+
+        [HarmonyPatch(typeof(LobbyManager), nameof(LobbyManager.OnStopClient))]
+        static class StopClientCleanupPatch
+        {
+            static void Prefix()
+            {
+                ClearSpectatorState("client stopped");
+            }
+        }
+
+        [HarmonyPatch(typeof(NetworkLobbyManager), nameof(NetworkLobbyManager.OnStopHost))]
+        static class StopHostCleanupPatch
+        {
+            static void Prefix()
+            {
+                ClearSpectatorState("host stopped");
+            }
+        }
+
+        private static void ClearSpectatorState(string reason)
+        {
+            if (spectators.Count == 0)
+                return;
+
+            Debug.Log($"[SpectatorMod] {reason}, clearing {SpectatorCount} spectator(s)");
+            spectators.Clear();
+        }
+
+        // ------------------------------------------------------------------
+        // Couch visibility + seat reconciliation (treehouse only)
+        // ------------------------------------------------------------------
+
+        // Vanilla creates three seats from serialized transforms in Start().
+        // Keep those scene transforms untouched (offline hotseat still uses the
+        // vanilla layout), but replace the online runtime array with eight
+        // evenly squeezed positions spanning the original left/right bounds.
+        [HarmonyPatch(typeof(HotSeat), "Start")]
+        static class ExpandOnlineCouchPatch
+        {
+            static void Postfix(HotSeat __instance)
+            {
+                if (Active)
+                    EnsureExpandedSeats(__instance);
+            }
+        }
+
+        private static void EnsureExpandedSeats(HotSeat couch)
+        {
+            if (couch == null || !Active || couch.seats == null
+                || couch.seats.Length >= OnlineSpectatorSeatCount)
+                return;
+
+            Vector3 left;
+            Vector3 right;
+            if (couch.SeatPositions != null && couch.SeatPositions.Length > 0)
+            {
+                left = couch.SeatPositions[0].position;
+                right = left;
+                foreach (Transform position in couch.SeatPositions)
+                {
+                    if (position == null)
+                        continue;
+                    if (position.position.x < left.x)
+                        left = position.position;
+                    if (position.position.x > right.x)
+                        right = position.position;
+                }
+            }
+            else
+            {
+                left = couch.transform.position;
+                right = left;
+            }
+
+            HotSeat.Seat[] oldSeats = couch.seats;
+            HotSeat.Seat[] expanded = new HotSeat.Seat[OnlineSpectatorSeatCount];
+            for (int i = 0; i < expanded.Length; i++)
+            {
+                float amount = expanded.Length == 1 ? 0.5f : (float)i / (expanded.Length - 1);
+                expanded[i] = new HotSeat.Seat(Vector3.Lerp(left, right, amount));
+            }
+
+            // Normally expansion runs before anyone can sit. Preserve any
+            // already-occupied characters if a late initialization path calls
+            // this after requests have begun.
+            int occupiedIndex = 0;
+            foreach (HotSeat.Seat oldSeat in oldSeats)
+            {
+                if (oldSeat == null || !oldSeat.occupied || oldSeat.character == null)
+                    continue;
+                expanded[occupiedIndex].occupied = true;
+                expanded[occupiedIndex].character = oldSeat.character;
+                occupiedIndex++;
+            }
+
+            couch.seats = expanded;
+            Debug.Log($"[SpectatorMod] expanded online couch from {oldSeats.Length} "
+                + $"to {expanded.Length} seats");
+        }
+
+        // Vanilla HotSeat tracks only Character objects in charactersAtCouch,
+        // even though a Character has many child colliders. The first child
+        // collider to leave removes the Character from that list while other
+        // colliders may still overlap the couch. This is especially easy to
+        // trigger while jumping. Determine eligibility from the live collider
+        // contacts instead so one child exiting cannot invalidate the others.
+        [HarmonyPatch(typeof(HotSeat), nameof(HotSeat.CharacterAtCouch))]
+        static class HotSeatCharacterAtCouchPatch
+        {
+            static bool Prefix(HotSeat __instance, Character c, ref bool __result)
+            {
+                if (!Active)
+                    return true;
+
+                __result = false;
+                if (c == null || !c.gameObject.activeInHierarchy)
+                    return false;
+
+                Collider2D[] couchColliders = __instance.GetComponents<Collider2D>();
+                Collider2D[] characterColliders = c.GetComponentsInChildren<Collider2D>();
+                foreach (Collider2D couchCollider in couchColliders)
+                {
+                    if (couchCollider == null || !couchCollider.isActiveAndEnabled)
+                        continue;
+
+                    foreach (Collider2D characterCollider in characterColliders)
+                    {
+                        if (characterCollider != null && characterCollider.isActiveAndEnabled
+                            && couchCollider.IsTouching(characterCollider))
                         {
-                            Debug.Log("[SpectatorMod] Re-enabling UsingHotSeat because spectators are still present");
-                            GameState.GetInstance().UsingHotSeat = true;
-                            
-                            // Re-lock party mode button if needed
-                            var controller = LevelSelectController.lastInstance;
-                            if (controller != null && !controller.PartyModeButton.Locked)
-                            {
-                                controller.PartyModeButton.Lock();
-                                Debug.Log("[SpectatorMod] Re-locked party mode button for spectators");
-                            }
+                            __result = true;
+                            return false;
                         }
                     }
                 }
-                catch (System.Exception ex)
+                return false;
+            }
+        }
+
+        // Spectators occupy the couch visually, but they are not vanilla
+        // shared-controller hotseat players. LevelSelectController subtracts
+        // GetSeatsTaken() from its ready-player target while still counting
+        // COUCH-status lobby players as present. If every online player is a
+        // spectator that makes the target zero and starts the previous mode.
+        [HarmonyPatch(typeof(HotSeat), nameof(HotSeat.GetSeatsTaken))]
+        static class HotSeatGetSeatsTakenPatch
+        {
+            static bool Prefix(ref int __result)
+            {
+                if (!Active)
+                    return true;
+
+                __result = 0;
+                return false;
+            }
+        }
+
+        // Vanilla Update() hides the couch in online games and SitPlayer no-ops
+        // while hidden. Online with spectator mode we keep it shown and reconcile
+        // the seats against the synced spectator set every frame.
+        [HarmonyPatch(typeof(HotSeat), "Update")]
+        static class HotSeatUpdatePatch
+        {
+            static bool Prefix(HotSeat __instance)
+            {
+                if (!Active)
+                    return true; // vanilla behavior (local couch, or mode off)
+
+                EnsureExpandedSeats(__instance);
+                __instance.show();
+                ApplyCouchStyling(__instance);
+                ReconcileSeats(__instance);
+                AutoSpectate.Tick(__instance);
+                return false;
+            }
+        }
+
+        // Idempotent: seats every spectator character, frees seats of
+        // non-spectators and departed characters. Characters are teleported only
+        // on their owning peer; remote peers just mirror pose and bookkeeping.
+        private static void ReconcileSeats(HotSeat couch)
+        {
+            if (couch.seats == null || LobbyManager.instance == null)
+                return;
+
+            foreach (NetworkLobbyPlayer slot in LobbyManager.instance.lobbySlots)
+            {
+                LobbyPlayer lobbyPlayer = slot as LobbyPlayer;
+                if (lobbyPlayer == null || lobbyPlayer.CharacterInstance == null)
+                    continue;
+
+                if (IsSpectator(lobbyPlayer.networkNumber))
                 {
-                    Debug.LogError($"[SpectatorMod] Error in OnLobbyPlayerObjectDestroyed patch: {ex.Message}");
+                    SeatCharacter(couch, lobbyPlayer.CharacterInstance, lobbyPlayer.IsLocalPlayer,
+                        lobbyPlayer.networkNumber);
+                }
+                else
+                {
+                    UnseatCharacter(couch, lobbyPlayer.CharacterInstance);
+                }
+            }
+
+            // Free seats whose character no longer exists (left/despawned).
+            foreach (HotSeat.Seat seat in couch.seats)
+            {
+                if (seat.occupied && seat.character == null)
+                {
+                    seat.occupied = false;
+                }
+            }
+        }
+
+        private static void SeatCharacter(HotSeat couch, Character character, bool isOwner, int networkNumber)
+        {
+            foreach (HotSeat.Seat seat in couch.seats)
+            {
+                if (seat.occupied && seat.character == character)
+                    return; // already seated
+            }
+
+            foreach (HotSeat.Seat seat in couch.seats)
+            {
+                if (seat.occupied)
+                    continue;
+
+                seat.occupied = true;
+                seat.character = character;
+                character.Sitting = true;
+                if (isOwner)
+                {
+                    // Positions are owner-authoritative; remote peers get this
+                    // via normal character sync.
+                    character.transform.position = seat.position;
+                    var body = character.GetComponent<Rigidbody2D>();
+                    if (body != null) body.velocity = Vector2.zero;
+                    character.Ready = true;
+                }
+                foreach (SpriteRenderer renderer in character.GetComponentsInChildren<SpriteRenderer>())
+                {
+                    renderer.sortingLayerName = "Default2";
+                }
+                Debug.Log($"[SpectatorMod] seated net={networkNumber} owner={isOwner}");
+                return;
+            }
+        }
+
+        private static void UnseatCharacter(HotSeat couch, Character character)
+        {
+            foreach (HotSeat.Seat seat in couch.seats)
+            {
+                if (!seat.occupied || seat.character != character)
+                    continue;
+
+                seat.occupied = false;
+                seat.character = null;
+                character.Sitting = false;
+                character.Ready = false;
+                foreach (SpriteRenderer renderer in character.GetComponentsInChildren<SpriteRenderer>())
+                {
+                    renderer.sortingLayerName = "Player";
+                }
+                Debug.Log("[SpectatorMod] unseated character " + character.name);
+                return;
+            }
+        }
+
+        // Green tint + "Spectator Couch" label so the online couch is clearly not
+        // the vanilla hotseat. Applied once per HotSeat instance.
+        private static int styledCouchId;
+
+        private static void ApplyCouchStyling(HotSeat couch)
+        {
+            if (couch.GetInstanceID() == styledCouchId)
+                return;
+            styledCouchId = couch.GetInstanceID();
+
+            foreach (Text text in couch.GetComponentsInChildren<Text>())
+            {
+                string lower = text.text != null ? text.text.ToLowerInvariant() : "";
+                if (lower.Contains("couch") || lower.Contains("hot"))
+                {
+                    text.text = "Spectator Couch";
+                }
+            }
+            foreach (SpriteRenderer renderer in couch.GetComponentsInChildren<SpriteRenderer>())
+            {
+                renderer.color = new Color(0.55f, 1f, 0.55f, 1f);
+            }
+        }
+
+        // ------------------------------------------------------------------
+        // Entry / exit input (treehouse)
+        // ------------------------------------------------------------------
+
+        // Runs before the vanilla handler. Mirrors the vanilla local-player
+        // resolution, then: Accept at the couch with a picked character requests
+        // sitting (and blocks the dead-online vanilla couch branch); Accept while
+        // seated as spectator requests standing up.
+        [HarmonyPatch(typeof(LevelSelectController), nameof(LevelSelectController.ReceiveEvent))]
+        static class CouchInputPatch
+        {
+            static bool Prefix(LevelSelectController __instance, InputEvent e)
+            {
+                if (!Active)
+                    return true;
+                if (__instance.levelChosen || __instance.castingVotes || Controller.FullScreenComputerIsActive)
+                    return true;
+                if (e.Key != InputEvent.InputKey.Accept || !e.Valueb || !e.Changed)
+                    return true;
+                if (e.Sender.IsKeyboard && Controller.InputFieldWasActiveRecently)
+                    return true;
+                if (e.Sender.GetControlMask() <= 0)
+                    return true;
+
+                foreach (LobbyPlayer lobbyPlayer in __instance.JoinedPlayers)
+                {
+                    if (lobbyPlayer == null || !lobbyPlayer.IsLocalPlayer
+                        || !e.Sender.ControlsPlayer(lobbyPlayer.localNumber))
+                        continue;
+
+                    Character character = lobbyPlayer.CharacterInstance;
+
+                    // Stand up: seated spectator pressed Accept.
+                    if (lobbyPlayer.PlayerStatus == LobbyPlayer.Status.COUCH
+                        && IsSpectator(lobbyPlayer.networkNumber))
+                    {
+                        Debug.Log($"[SpectatorMod] local exit request net={lobbyPlayer.networkNumber}");
+                        RequestSetSpectator(lobbyPlayer.networkNumber, false);
+                        return false;
+                    }
+
+                    // Sit down: character standing at the couch pressed Accept.
+                    if (lobbyPlayer.PlayerStatus == LobbyPlayer.Status.CHARACTER
+                        && character != null && !character.InMenu
+                        && __instance.HotSeatCouch != null
+                        && __instance.HotSeatCouch.CharacterAtCouch(character))
+                    {
+                        Debug.Log($"[SpectatorMod] local sit request net={lobbyPlayer.networkNumber}");
+                        RequestSetSpectator(lobbyPlayer.networkNumber, true);
+                        return false;
+                    }
+                }
+                return true;
+            }
+        }
+
+        // Suicide/unpick while seated would drop the spectator's character and
+        // spawn a lobby cursor mid-couch; swallow it.
+        [HarmonyPatch(typeof(LobbyPlayer), nameof(LobbyPlayer.ReceiveEvent))]
+        static class BlockSuicideWhileSeatedPatch
+        {
+            static bool Prefix(LobbyPlayer __instance, InputEvent e)
+            {
+                if (!Active)
+                    return true;
+                if (e.Key == InputEvent.InputKey.Suicide && IsSpectator(__instance.networkNumber))
+                {
+                    return false;
+                }
+                return true;
+            }
+        }
+
+        // ------------------------------------------------------------------
+        // Game start / return to lobby
+        // ------------------------------------------------------------------
+
+        // Every peer removes spectators from the play queue the same way, so all
+        // downstream counts (scoreboard, turn order, inventory book) agree.
+        // Their spawned character/cursor objects are parked inactive.
+        [HarmonyPatch(typeof(GameControl), "SetupStart")]
+        static class FilterSpectatorsFromGamePatch
+        {
+            static void Postfix(GameControl __instance)
+            {
+                if (!Active || SpectatorCount == 0)
+                    return;
+
+                var filtered = new Queue<GamePlayer>();
+                int removed = 0;
+                foreach (GamePlayer gamePlayer in __instance.PlayerQueue)
+                {
+                    if (gamePlayer != null && IsSpectator(gamePlayer.networkNumber))
+                    {
+                        removed++;
+                        if (gamePlayer.CharacterInstance != null)
+                            gamePlayer.CharacterInstance.gameObject.SetActive(false);
+                        if (gamePlayer.CursorInstance != null)
+                            gamePlayer.CursorInstance.gameObject.SetActive(false);
+                    }
+                    else
+                    {
+                        filtered.Enqueue(gamePlayer);
+                    }
+                }
+
+                if (removed > 0)
+                {
+                    __instance.PlayerQueue = filtered;
+                    Debug.Log($"[SpectatorMod] filtered {removed} spectator(s) from PlayerQueue, "
+                        + $"{filtered.Count} players remain");
+                }
+            }
+        }
+
+        // Returning to the treehouse, vanilla restores COUCH-status players as
+        // hotseat players (forces UsingHotSeat + locks the party-mode button).
+        // For online spectators keep the seat but undo those two side effects.
+        [HarmonyPatch(typeof(LevelSelectController), "setupController")]
+        static class RestoreSpectatorNotHotseatPatch
+        {
+            static void Postfix(LevelSelectController __instance, LobbyPlayer lobbyPl)
+            {
+                if (!Active || lobbyPl == null || !IsSpectator(lobbyPl.networkNumber))
+                    return;
+
+                // Scene return recreates lobby characters and resets their
+                // owning LobbyPlayer status to CHARACTER. Restore COUCH on the
+                // owner so Accept means "stand up" again. Non-owner writes to
+                // PlayerStatus are intentionally avoided.
+                if (lobbyPl.IsLocalPlayer && lobbyPl.PlayerStatus != LobbyPlayer.Status.COUCH)
+                {
+                    lobbyPl.PlayerStatus = LobbyPlayer.Status.COUCH;
+                }
+                GameState.GetInstance().UsingHotSeat = false;
+                if (__instance.PartyModeButton != null && __instance.PartyModeButton.Locked)
+                {
+                    __instance.PartyModeButton.Unlock();
+                }
+                Debug.Log($"[SpectatorMod] restored spectator {lobbyPl.networkNumber} without hotseat side effects");
+            }
+        }
+
+        // ------------------------------------------------------------------
+        // Test hook: --auto-spectate[=SECONDS]
+        // ------------------------------------------------------------------
+
+        // Hands-free E2E testing: once the local player has a character in the
+        // treehouse, walk them onto the couch and request sitting. Driven by the
+        // per-frame reconciler tick above; no dependency on any test harness mod.
+        private static class AutoSpectate
+        {
+            private const string Argument = "--auto-spectate";
+
+            private static readonly bool requested;
+            private static readonly float delaySeconds = 2f;
+            private static bool done;
+            private static float readySince = -1f;
+            private static float nextPickAttempt;
+
+            static AutoSpectate()
+            {
+                foreach (string arg in System.Environment.GetCommandLineArgs())
+                {
+                    if (!arg.StartsWith(Argument, System.StringComparison.OrdinalIgnoreCase))
+                        continue;
+                    requested = true;
+                    string value = arg.Substring(Argument.Length).TrimStart('=').Trim();
+                    if (!string.IsNullOrEmpty(value)
+                        && float.TryParse(value, System.Globalization.NumberStyles.Float,
+                            System.Globalization.CultureInfo.InvariantCulture, out float parsed))
+                    {
+                        delaySeconds = parsed;
+                    }
+                    Debug.Log($"[SpectatorMod] auto-spectate armed (delay {delaySeconds}s)");
+                    break;
+                }
+            }
+
+            public static void Tick(HotSeat couch)
+            {
+                if (!requested || done || LobbyManager.instance == null)
+                    return;
+
+                foreach (NetworkLobbyPlayer slot in LobbyManager.instance.lobbySlots)
+                {
+                    LobbyPlayer lobbyPlayer = slot as LobbyPlayer;
+                    if (lobbyPlayer == null || !lobbyPlayer.IsLocalPlayer)
+                        continue;
+
+                    // Still on the lobby cursor: pick any free character first
+                    // (sitting requires CHARACTER status). Retried until it lands.
+                    if (lobbyPlayer.PlayerStatus == LobbyPlayer.Status.CURSOR
+                        && Time.time >= nextPickAttempt)
+                    {
+                        nextPickAttempt = Time.time + 3f;
+                        foreach (Character candidate in Object.FindObjectsOfType<Character>())
+                        {
+                            if (!candidate.Picked && candidate.gameObject.activeInHierarchy)
+                            {
+                                Debug.Log("[SpectatorMod] auto-spectate: picking " + candidate.CharacterSprite);
+                                lobbyPlayer.RequestPickCharacter(candidate);
+                                break;
+                            }
+                        }
+                        continue;
+                    }
+
+                    if (lobbyPlayer.PlayerStatus != LobbyPlayer.Status.CHARACTER
+                        || lobbyPlayer.CharacterInstance == null)
+                        continue;
+
+                    if (readySince < 0f)
+                    {
+                        readySince = Time.time;
+                        return;
+                    }
+                    if (Time.time - readySince < delaySeconds)
+                        return;
+
+                    Debug.Log($"[SpectatorMod] auto-spectate: seating net={lobbyPlayer.networkNumber}");
+                    lobbyPlayer.CharacterInstance.transform.position = couch.transform.position;
+                    RequestSetSpectator(lobbyPlayer.networkNumber, true);
+                    done = true;
+                    return;
                 }
             }
         }

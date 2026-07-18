@@ -5,6 +5,11 @@ Analysis of the decompiled 1.13 source at
 written while auditing the spectator-couch work in `Patches/SpectatorMod.cs` /
 `Patches/SpectatorHotSeat.cs`. Line numbers refer to the decompiled files.
 
+See also [UCH_LATEJOIN_ANALYSIS.md](UCH_LATEJOIN_ANALYSIS.md) for the facts
+discovered while building the late-join feature (connection gates, scene msg 39
++ early-Ready hazard, kick/purge paths, welcome-handshake contents,
+non-networked ScoreKeeper, piece replay, Steam joinability).
+
 ## 1. Transport & message plumbing
 
 - The game uses **UNet HLAPI** (`UnityEngine.Networking`). `LobbyManager :
@@ -14,7 +19,8 @@ written while auditing the spectator-couch work in `Patches/SpectatorMod.cs` /
   short` values computed as `47 + (++msgCount)` — i.e. sequential IDs **48..~105**
   (base 47 = UNet `MsgType.Highest`). Examples: `NetworkClientConnected=48`,
   `GameRuleSet=50`, `CharacterPicked=51`, `LobbyVoting=77`, … `ThwompTriggered`
-  last. **Message ID 1000 is unused by the game** — safe for a mod message.
+  last. IDs above the vanilla range still require coordination with other mods;
+  no fixed custom ID should be treated as globally safe.
 - Handler registration happens in one LobbyManager method (~lines 262–373):
   - Server: `NetworkServer.RegisterHandler(NetMsgTypes.X, distributeServerMessage)`
   - Client: `this.client.RegisterHandler(NetMsgTypes.X, distributeMessage)`
@@ -129,8 +135,10 @@ written while auditing the spectator-couch work in `Patches/SpectatorMod.cs` /
 
 ## 6. Implications for the spectator mod (delta vs. current code)
 
-- Current `SpectatorMod.cs` uses a custom `MessageBase` with ID 1000 — ID choice
-  is safe (§1), but the send/receive topology is asymmetric (server applies
+- Current `SpectatorMod.cs` uses custom `MessageBase` IDs 1010-1011 — this is a
+  temporary allocation pending ecosystem-wide ID coordination; ID choice
+  avoids the vanilla range but is not globally collision-proof (§1). The
+  send/receive topology is asymmetric (server applies
   sit/unsit only, clients only update a dictionary) instead of the game's own
   relay-and-apply-everywhere pattern, so seat visuals desync across peers.
 - Setting `lobbyPlayer.PlayerStatus = COUCH` for *remote* players (e.g. in

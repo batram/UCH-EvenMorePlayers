@@ -41,6 +41,8 @@ namespace MorePlayers
             lateJoinMode = Config.Bind("LateJoin", "lateJoinMode", "play", "How to enter a running game: 'play' (drop in at the next build phase) or 'spectate' (watch until back in the treehouse)");
             lateJoinAutoPick = Config.Bind("LateJoin", "lateJoinAutoPick", true, "Automatically pick the first free animal when late joining mid-level (no pick UI in-level)");
             lateJoinKeepVisible = Config.Bind("LateJoin", "lateJoinKeepVisible", true, "Keep the hosted lobby visible and joinable in the lobby browser while a game is running");
+            SpectatorCouch.InitializeConfigurationBoundary();
+
             og_version = GameSettings.GetInstance().versionNumber;
             PlayerManager.maxPlayers = newPlayerLimit.Value;
             new Harmony("EvenMorePlayers.PlayerNumPatch").PatchAll();
