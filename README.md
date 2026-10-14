@@ -22,6 +22,8 @@ The mod is available via [thunderstore.io](https://thunderstore.io/c/ultimate-ch
 - Put all the contents inside the zip files into your `Ultimate Chicken Horse` folder found via `Steam -> Manage -> Browse Local Files`.
 Run game! (Linux users need an additional step, follow instructions in BepInEx)
 
+macOS users: follow the [macOS installation guide](https://github.com/batram/UCH-EvenMorePlayers/wiki/macOS-Installation).
+
 ## Help
 If you have questions, comments or suggestions join the [UCH Mods discord](https://discord.gg/DACBGXVww7)
 
