@@ -45,6 +45,70 @@ namespace MorePlayers
             var region = AccessTools.Method(typeof(GamesparksMatchmakingLobby), nameof(GamesparksMatchmakingLobby.GetLobbyRegion));
             var regionPostfix = AccessTools.Method(typeof(JoinPreflight), nameof(LobbyRegionPostfix));
             harmony.Patch(region, postfix: new HarmonyMethod(regionPostfix));
+
+            var joined = AccessTools.Method(typeof(UnityMatchmaker), nameof(UnityMatchmaker.onLobbyJoined));
+            var joinedPostfix = AccessTools.Method(typeof(JoinPreflight), nameof(LobbyJoinedPostfix));
+            harmony.Patch(joined, postfix: new HarmonyMethod(joinedPostfix));
+
+            var leave = AccessTools.Method(typeof(UnityMatchmaker), nameof(UnityMatchmaker.LeaveLobby));
+            var leavePostfix = AccessTools.Method(typeof(JoinPreflight), nameof(LeaveLobbyPostfix));
+            harmony.Patch(leave, postfix: new HarmonyMethod(leavePostfix));
+
+            var clearForced = new HarmonyMethod(AccessTools.Method(typeof(JoinPreflight), nameof(ClearStaleForcedDisconnects)));
+            foreach (var method in AccessTools.GetDeclaredMethods(typeof(MLAPI.Relay.Transports.UnetRelayTransport)))
+            {
+                if (method.Name.StartsWith("AddHost") || method.Name == "Shutdown")
+                {
+                    harmony.Patch(method, prefix: clearForced);
+                }
+            }
+        }
+
+        // Stock bug in the relay transport: when a host leaves while players are still connected,
+        // Disconnect() queues a "forced disconnect" event per player in queuedForceDisconnects, and the
+        // host stops polling before they are delivered. The transport lives for the whole game session
+        // and Shutdown() does not clear the queue, so the next session on this machine starts with
+        // them. ReceiveFromHost() returns queued entries before reading the network, so a later client
+        // connection receives the old disconnect on its first poll and drops before sending anything:
+        // the first join after hosting fails ("Lobby Client disconnected"), a retry works.
+        // A new UNet host (any client or host session) or a shutdown makes those entries meaningless.
+        static void ClearStaleForcedDisconnects(MLAPI.Relay.Transports.UnetRelayTransport __instance)
+        {
+            if (__instance.queuedForceDisconnects != null && __instance.queuedForceDisconnects.Count > 0)
+            {
+                Debug.Log("[MorePlayersMod] dropping " + __instance.queuedForceDisconnects.Count
+                    + " stale relay disconnect event(s) from the previous session");
+                __instance.queuedForceDisconnects.Clear();
+            }
+        }
+
+        // Stock bug: a Steam invite / "Join Game" first enters the friend's Steam lobby, then joins the
+        // backend lobby. When that join fails before the match starts (lobby expired, full, version
+        // mismatch), onLobbyJoined(false) just returns and LeaveLobby only leaves the Steam lobby once a
+        // match was entered. The player stays in the dead Steam lobby, Steam keeps advertising it to
+        // friends, and their "Join Game" lands there and fails the same way.
+        static void LobbyJoinedPostfix(UnityMatchmaker __instance, bool success)
+        {
+            if (!success)
+            {
+                LeaveStaleSteamLobby(__instance, "failed join");
+            }
+        }
+
+        static void LeaveLobbyPostfix(UnityMatchmaker __instance)
+        {
+            LeaveStaleSteamLobby(__instance, "left lobby");
+        }
+
+        static void LeaveStaleSteamLobby(UnityMatchmaker matchmaker, string why)
+        {
+            var steam = matchmaker as SteamMatchmaker;
+            if (steam == null || steam.SteamLobby == null || steam.isOwner || steam.IsInLobby())
+            {
+                return;
+            }
+            Debug.Log("[MorePlayersMod] " + why + ", leaving the Steam lobby it entered");
+            steam.leavePlatformLobby();
         }
 
         // Stock bug: a "Host P2P" lobby never gets a relay region (only CreateMatch sets it), so
