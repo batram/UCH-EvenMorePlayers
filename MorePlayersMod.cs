@@ -9,15 +9,15 @@ using System.Reflection.Emit;
 using UnityEngine;
 using UnityEngine.Networking;
 
-[assembly: AssemblyVersion("10.0.1")]
-[assembly: AssemblyInformationalVersion("10.0.1")]
+[assembly: AssemblyVersion("10.0.2")]
+[assembly: AssemblyInformationalVersion("10.0.2")]
 
 namespace MorePlayers
 {
-    [BepInPlugin("EvenMorePlayers", "EvenMorePlayers", "10.0.1")]
+    [BepInPlugin("EvenMorePlayers", "EvenMorePlayers", "10.0.2")]
     public class MorePlayersMod : BaseUnityPlugin
     {
-        public static string mod_version = "10.0.1";
+        public static string mod_version = "10.0.2";
         public static string mod_version_full = "modded_" + mod_version.Replace(".", "-");
 
         public static ConfigEntry<int> newPlayerLimit;
@@ -33,9 +33,11 @@ namespace MorePlayers
             shuffleScoreBalancer = Config.Bind("General", "shuffleScoreBalancer", true, "On the Score Balancer in the Treehouse show the Player that last change it on top");
 
             og_version = GameSettings.GetInstance().versionNumber;
+            ModMode.VanillaMaxPlayers = GameSettings.GetInstance().MaxPlayers;
             PlayerManager.maxPlayers = newPlayerLimit.Value;
-            new Harmony("EvenMorePlayers.PlayerNumPatch").PatchAll();
+            new Harmony(ModMode.PlayerNumPatchId).PatchAll();
             MenuPatch.PatchMenu();
+            JoinPreflight.Patch();
             Debug.Log("[MorePlayersMod] started.");
         }
     }

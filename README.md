@@ -5,6 +5,7 @@ This is an `Ultimate Chicken Horse` `BepInEx` mod that allows for more than 4 pl
 
 All players need the mod.
 The mod is disabled in normal Online play and only enabled when playing online via the "More" button.
+When joining a lobby through a Steam invite, Steam "Join Game" or a lobby code, the mod checks the host's lobby first and switches to modded or normal mode to match it, no matter which button was clicked before.
 
 <img src="https://user-images.githubusercontent.com/1382274/175807071-2c539967-54fc-4857-938e-7a339503e0e5.png" width="450px">
 

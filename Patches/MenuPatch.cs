@@ -34,35 +34,24 @@ namespace MorePlayers
         static public void Prefix(TabletButton __instance)
         {
             Debug.Log("Pressed da button: " + __instance.gameObject.name);
+            var parent = __instance.transform.parent;
+            if (parent == null || parent.name != "main Buttons")
+            {
+                return;
+            }
+
             if (__instance.gameObject.name == "Play More")
             {
-                if (!GameSettings.GetInstance().versionNumber.StartsWith(MorePlayersMod.mod_version_full))
-                {
-                    GameSettings.GetInstance().versionNumber = MorePlayersMod.mod_version_full + "_" + MorePlayersMod.og_version;
-                    // drop version patch number, so players on same minor version can play together
-                    var vparts = MorePlayersMod.mod_version_full.Split('-');
-                    var hparts = MorePlayersMod.og_version.Split('.');
-
-                    GameSettings.GetInstance().parsedMatchmakingNumber = vparts[0] + "-" + vparts[1] + "_" + hparts[0] + "." + hparts[1];
-                    GameSettings.GetInstance().parsedVersionNumberProd = null;
-
-                    if (PlayerManager.maxPlayers != MorePlayersMod.newPlayerLimit.Value)
-                    {
-                        PlayerManager.maxPlayers = MorePlayersMod.newPlayerLimit.Value;
-                        new Harmony("EvenMorePlayers.PlayerNumPatch").PatchAll();
-                    }
-                }
+                ModMode.EnableModded();
             }
             else if (__instance.gameObject.name == "Play Online")
             {
-                GameSettings.GetInstance().versionNumber = MorePlayersMod.og_version;
-                // Reset parsedMatchmakingNumber to force recalculation
-                GameSettings.GetInstance().parsedMatchmakingNumber = null;
-                GameSettings.GetInstance().parsedVersionNumberProd = null;
-
-                PlayerManager.maxPlayers = 4;
-                Harmony.UnpatchID("EvenMorePlayers.PlayerNumPatch");
-                MoreCode.CleanGUI();
+                ModMode.EnableVanilla();
+            }
+            else if (__instance.gameObject.name == "Play")
+            {
+                // local play: more players, version does not matter offline
+                ModMode.EnablePatches();
             }
         }
     }
