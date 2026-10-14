@@ -97,6 +97,8 @@ namespace MorePlayers
 
         static void LeaveLobbyPostfix(UnityMatchmaker __instance)
         {
+            // a join held during startup must not be replayed after the player left
+            joinRequest++;
             LeaveStaleSteamLobby(__instance, "left lobby");
         }
 
@@ -131,6 +133,10 @@ namespace MorePlayers
 
         static bool holdBypass;
 
+        // Current JoinLobby request. Every new join (held or not) and every LeaveLobby moves it on, so
+        // a join held during startup is only replayed if nothing replaced or cancelled it meanwhile.
+        static int joinRequest;
+
         // The relay region list is downloaded after MainMenu starts (TabletMainMenuHome ->
         // RelayConstants.PopulateAvailableRegions). Until then GetLobbyRegion cannot resolve the
         // host's region id, so a join started that early asks the wrong region for the relay server.
@@ -146,24 +152,34 @@ namespace MorePlayers
         // Hold the join until both are there.
         static bool JoinLobbyPrefix(GamesparksMatchmaker __instance, string lobbyID, bool useCode, UnityAction<bool> callback)
         {
-            if (holdBypass || BackendReady())
+            if (holdBypass)
+            {
+                return true;
+            }
+            int request = ++joinRequest;
+            if (BackendReady())
             {
                 return true;
             }
             Debug.Log("[MorePlayersMod] backend not up yet, holding join of " + lobbyID);
-            __instance.StartCoroutine(JoinWhenBackendReady(__instance, lobbyID, useCode, callback));
+            __instance.StartCoroutine(JoinWhenBackendReady(__instance, request, lobbyID, useCode, callback));
             return false;
         }
 
-        static IEnumerator JoinWhenBackendReady(GamesparksMatchmaker matchmaker, string lobbyID, bool useCode, UnityAction<bool> callback)
+        static IEnumerator JoinWhenBackendReady(GamesparksMatchmaker matchmaker, int request, string lobbyID, bool useCode, UnityAction<bool> callback)
         {
             // wall clock, frame deltas are clamped while scenes load
             float start = Time.realtimeSinceStartup;
             float waited = 0f;
-            while (!BackendReady() && waited < BackendWaitSeconds)
+            while (!BackendReady() && waited < BackendWaitSeconds && request == joinRequest)
             {
                 yield return null;
                 waited = Time.realtimeSinceStartup - start;
+            }
+            if (request != joinRequest)
+            {
+                Debug.Log("[MorePlayersMod] held join of " + lobbyID + " was cancelled or replaced, not joining");
+                yield break;
             }
             if (GameSparksManager.Instance == null)
             {
